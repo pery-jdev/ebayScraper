@@ -1,0 +1,19 @@
+base:
+  debug: true
+  directories:
+    base: .
+    temp: tests/temp
+    data: tests/data
+    driver: tests/temp/driver
+
+translation:
+  default_provider: google
+  providers:
+    google:
+      enabled: true
+      api_key: TEST_GOOGLE_API_KEY
+      priority: 1
+    bing:
+      enabled: false
+      api_key: null
+      priority: 2

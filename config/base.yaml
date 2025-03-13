@@ -1,0 +1,26 @@
+base:
+  debug: true
+  directories:
+    base: .
+    temp: temp
+    data: data
+    driver: temp/driver
+
+translation:
+  default_provider: alibaba
+  providers:
+    google:
+      enabled: true
+      api_key: null
+      priority: 1
+    bing:
+      enabled: true
+      api_key: null
+      priority: 2
+  timeout: 10
+  retry: 3
+  multiple:
+    mode: batch
+    batch_size: 10
+    max_workers: 4
+    timeout_per_text: 5

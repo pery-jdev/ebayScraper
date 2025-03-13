@@ -6,12 +6,18 @@ from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.driver_cache import DriverCacheManager
 from urllib.parse import urlencode
 
 
-from spider.config import Config as cfg
+from core.config import Config as cfg
+from spider.utils.selenium_page_loader import PageLoader
 
 
 class SpiderResponse(object):
@@ -62,13 +68,24 @@ class SpiderResponse(object):
             # formatted url here
             url = f"{url}{urlencode(params)}"
             print(f"Requesting url use selenium: {url}")
-            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager(cache_manager=DriverCacheManager(cfg.DRIVER_PATH)).install()),)
-            driver.get(url)
-            if cfg.DEBUG:
-                with open(cfg.TEMP_DIR / "response.html", "w+") as f:
-                    f.write(driver.page_source)
-                    
-                    return BeautifulSoup(f.read(), "html.parser")
-            
+            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager(cache_manager=DriverCacheManager(cfg.DRIVER_PATH)).install()))
+            try:
+                driver.get(url)
+                loader = PageLoader(driver)
+                if loader.wait_for_page_load():
+                    print("Page fully loaded")
+                    # Perform actions on loaded page
+                else:
+                    print("Page load timeout")
+
+                if cfg.DEBUG:
+                    with open(cfg.TEMP_DIR / "response.html", "w+") as f:
+                        f.write(driver.page_source)
+                        
+                        return BeautifulSoup(f.read(), "html.parser")
+            except Exception as e:
+                print(e)
+                raise
+                
 
             return BeautifulSoup(driver.page_source, "html.parser")

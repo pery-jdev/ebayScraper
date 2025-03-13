@@ -1,0 +1,9 @@
+base:
+  debug: false
+
+translation:
+  providers:
+    google:
+      api_key: YOUR_PROD_GOOGLE_API_KEY
+    bing:
+      api_key: YOUR_PROD_BING_API_KEY
