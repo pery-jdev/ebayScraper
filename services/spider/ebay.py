@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
-from spider.parser import EbayParser
-from spider.response import SpiderResponse
-from core.config import Config as cfg
+from services.spider.parser import EbayParser
+from services.spider.response import SpiderResponse
+from core.config import config as cfg
 
 
 class EbaySpider(object):
@@ -27,3 +27,9 @@ class EbaySpider(object):
 
         products = self.parser.parse_products(soup=soup)
         print(products)
+    
+    def get_product_details(self, url: str):
+        # response = self.response.get_response(url=url, mode="selenium")
+        f = open(cfg.TEMP_DIR / "response.html", "r")
+        soup = BeautifulSoup(f.read(), "html.parser")
+        self.parser.parse_product_details(soup=soup)

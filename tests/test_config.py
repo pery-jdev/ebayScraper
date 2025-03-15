@@ -1,6 +1,3 @@
-import os
-from core.config import config
-
 def test_config_loading(test_config):
     assert test_config.DEBUG == True
     assert str(test_config.DATA_DIR).endswith('tests/data')

@@ -16,19 +16,19 @@ from webdriver_manager.core.driver_cache import DriverCacheManager
 from urllib.parse import urlencode
 
 
-from core.config import Config as cfg
-from spider.utils.selenium_page_loader import PageLoader
+from core.config import config as cfg
+from services.spider.utils.selenium_page_loader import PageLoader
 
 
 class SpiderResponse(object):
     def __init__(self):
         self.session: requests.Session = requests.Session()
-        self.modes = ['selenium', 'requests', 'httpx']
+        self.modes = ["selenium", "requests", "httpx"]
 
     def get_response(
         self,
         url: str,
-        params: dict[str, Any],
+        params: dict[str, Any] | None = None,
         headers: dict[str, Any] = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         },
@@ -37,8 +37,8 @@ class SpiderResponse(object):
     ) -> BeautifulSoup:
         if mode not in self.modes:
             raise ValueError(f"Mode {mode} is not supported. Choise from: {self.modes}")
-    
-        if mode == 'requests': 
+
+        if mode == "requests":
             if use_session:
                 res = self.session.get(url, params=params, headers=headers)
                 print(f"Using session to request url: {res.url}")
@@ -66,9 +66,19 @@ class SpiderResponse(object):
                 return BeautifulSoup(res.text, "html.parser")
         elif mode == "selenium":
             # formatted url here
-            url = f"{url}{urlencode(params)}"
+
+            try:
+                url = f"{url}{urlencode(params)}"
+            except:
+                pass
             print(f"Requesting url use selenium: {url}")
-            driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager(cache_manager=DriverCacheManager(cfg.DRIVER_PATH)).install()))
+            driver = webdriver.Chrome(
+                service=ChromeService(
+                    ChromeDriverManager(
+                        cache_manager=DriverCacheManager(cfg.DRIVER_PATH)
+                    ).install()
+                )
+            )
             try:
                 driver.get(url)
                 loader = PageLoader(driver)
@@ -81,11 +91,10 @@ class SpiderResponse(object):
                 if cfg.DEBUG:
                     with open(cfg.TEMP_DIR / "response.html", "w+") as f:
                         f.write(driver.page_source)
-                        
+
                         return BeautifulSoup(f.read(), "html.parser")
             except Exception as e:
                 print(e)
                 raise
-                
 
             return BeautifulSoup(driver.page_source, "html.parser")

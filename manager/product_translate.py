@@ -2,20 +2,23 @@ import logging
 import pandas as pd
 
 from typing import List, Optional
-from services.processor.file_processor import FileProcessor
+from services.processors.file_processor import FileProcessor
+from services.processors.data_processor import DataProcessor
 from services.translations.translator import MultiTranslator
 
 
 class ProductTranslateManager:
     def __init__(self):
         self.file_processor: FileProcessor = FileProcessor()
-        self.translator: MultiTranslator = MultiTranslator()
+        self.data_processor: DataProcessor = DataProcessor()
+        self.translator: MultiTranslator = MultiTranslator(translator='translators')
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
     def translate_product(self, columns: Optional[List[str]] = None):
         try:
             products = self.file_processor.read_csv("product.csv")
+            products = self.data_processor.remove_duplicates(products)
 
             if products is None:
                 self.logger.error("Failed to read input file")
@@ -46,7 +49,7 @@ class ProductTranslateManager:
                         text_to_translate = str(original_value)
                         
                         # Proses translasi
-                        translated = self.translator.translate_text(text=text_to_translate,)
+                        translated = self.translator.translate_text(text=text_to_translate)
                         
                         # Kembalikan ke tipe data asli
             
