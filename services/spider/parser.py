@@ -17,7 +17,6 @@ class EbayParser:
                 product_location = product.find('span', attrs={'class': 's-item__location'})
             except:
                 product_location = None
-            print(product_location)
 
             self.product_lists.append({
                 'title': title,
@@ -34,6 +33,17 @@ class EbayParser:
         product_image_lists: list[dict[str, str]] = []
 
         body = soup.find('div', attrs={'class': 'tabs__content'})
+
+        # prices
+        prices = soup.find('div', attrs={'data-testid': 'x-bin-price'})
+        price_primary = prices.find('div', attrs={'class':'x-price-primary'}).text.strip()
+        actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
+        saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
+        prices_dict: dict[str, str] = {
+            'price_primary': price_primary,
+            'actual_price': actual_price,
+            'saving': saving
+        }
         
         # images
         images = soup.find('div', attrs={'data-testid': 'x-photos'}).find_all('button', attrs={'class': 'ux-image-grid-item'})
@@ -42,16 +52,14 @@ class EbayParser:
                 image_url = image.find('img')['src']
             except:
                 image_url = image.find('img')['data-src']
-                
+
             image_alt = image.find('img')['alt']
             if image_alt and image_url != None:
                 product_image_lists.append({
                     'image_url': image_url,
                     'image_alt': image_alt
                 })
-            print(product_image_lists)
         product_sku = soup.find('div', attrs=['class', 'ux-layout-section__textual-display ux-layout-section__textual-display--itemId']).find('span', attrs={'class': 'ux-textspans ux-textspans--BOLD'}).text.strip()
-
 
         items = soup.find('div', attrs={'class': 'ux-layout-section-evo ux-layout-section--features'}).find_all('div',attrs={'class': 'ux-layout-section-evo__row'})
         for item in items:
@@ -63,4 +71,7 @@ class EbayParser:
                     products[item_col_label.text.strip()] = item_col_value.text.strip()
             
             # print(item_label, item_value)
+        products['product_sku'] = product_sku
+        products['product_images'] = product_image_lists
+        products['product_prices'] = prices_dict
         return products
