@@ -1,3 +1,4 @@
+import logging
 import requests
 import os
 
@@ -98,3 +99,25 @@ class SpiderResponse(object):
                 raise
 
             return BeautifulSoup(driver.page_source, "html.parser")
+
+
+class XeResponse(object):
+    def __init__(self):
+        self.session: requests.Session = requests.Session()
+
+    def get_response(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, Any] = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        },
+    ):
+        try:
+            response = self.session.get(
+                url=url, params=params, headers=headers, timeout=10
+            )
+            response.raise_for_status()
+            return BeautifulSoup(response.text, "html.parser")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"XE scraping failed: {str(e)}")

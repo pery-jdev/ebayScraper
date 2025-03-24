@@ -1,5 +1,12 @@
+import re
+
 from typing import Any
 from bs4 import BeautifulSoup
+from decimal import Decimal, ROUND_HALF_UP
+
+from services.spider.errors.xe import XEParserError
+from dto.responses.currency_response import CurrencyResponse
+from services.spider.utils.xe_formatter import XeFormatter
 
 class EbayParser:
     def __init__(self):
@@ -71,7 +78,76 @@ class EbayParser:
                     products[item_col_label.text.strip()] = item_col_value.text.strip()
             
             # print(item_label, item_value)
+
+        products['body'] = body
         products['product_sku'] = product_sku
         products['product_images'] = product_image_lists
         products['product_prices'] = prices_dict
         return products
+    
+
+class XeParser:
+    def __init__(self):
+        self.formatter: XeFormatter = XeFormatter()
+
+    def parse_rates(self, soup: BeautifulSoup):
+        """Parse currency conversion data from raw text"""
+        # Regex pattern untuk menangkap format: X [CUR1] = Y [CUR2]
+        rate_pattern = r"""
+            (\d+[\d,.]*)       # Jumlah mata uang asal (group 1)
+            \s*([A-Z]{3})      # Kode mata uang asal (group 2)
+            \s*=\s*
+            ([\d,]+\.\d+)      # Jumlah mata uang tujuan (group 3)
+            \s*([A-Z]{3})      # Kode mata uang tujuan (group 4)
+        """
+        
+        # Regex pattern untuk total konversi: = Z [Currency Name]
+        amount_pattern = r"""
+            =\s*
+            ([\d,]+\.\d+)      # Jumlah total (group 1)
+            \s*([A-Za-z\s]+)   # Nama mata uang (group 2)
+        """
+
+        conversion = soup.find('div', attrs={'class': '[grid-area:conversion]'}).find_all('p')
+        amount = conversion[0].text.strip()
+        converted_amount = conversion[1].text.strip()
+        base_rate = conversion[2].text.strip()
+        dst_rate = conversion[3].text.strip()
+
+        # process 
+
+        print(f"ammount: {amount}|| converted_amount: {converted_amount}|| base_rate: {base_rate}|| dst_rate: {dst_rate}") # print(converted_amount, '||', amount, '||', base_rate, '||', dst_rate)
+        # print(conversion)
+
+    
+
+    def parse_rate(self, soup: BeautifulSoup) -> CurrencyResponse:
+        conversion = soup.find('div', attrs={'class': '[grid-area:conversion]'}).find_all('p')
+        amount = conversion[0].text.strip()
+        converted_amount = conversion[1].text.strip()
+        base_rate = conversion[2].text.strip()
+        # dst_rate = conversion[3].text.strip()
+        currency_match = re.search(r'(\b[A-Z]{3}\b).*?(\b[A-Z]{3}\b)', base_rate)
+       
+        # parsing
+
+        amount = Decimal(re.sub(r'[^\d.]', '', amount))
+        result = Decimal(re.sub(r'[^\d.]', '', converted_amount))
+        rate = Decimal(re.sub(r'[^\d.]', '', base_rate.split('=')[1]))
+
+        currency_pair = f"{currency_match.group(1)}_{currency_match.group(2)}"
+
+        #  Ekstrak pasangan mata uang
+        return CurrencyResponse.from_conversion(
+            amount=amount,
+            rate=rate,
+            currency_pair=currency_pair,
+            method='web_scraping'
+        )
+
+        # print(f"ammount: {amount}|| converted_amount: {converted_amount}|| base_rate: {base_rate}|| dst_rate: {dst_rate}") # print(converted_amount, '||', amount, '||', base_rate, '||', dst_rate)
+
+
+
+    
+

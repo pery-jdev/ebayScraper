@@ -37,6 +37,9 @@ class Config:
         # Set translation config
         self.TRANSLATION = config['translation']
         
+        # Set currency config
+        self.ALPHA_VANTAGE_KEY = config['curency']['alphavantage_api_key']
+        
         return config
 
     def _merge_configs(self, base, override):
