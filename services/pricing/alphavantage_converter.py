@@ -1,8 +1,10 @@
 import requests
+
 from typing import Dict
 from decimal import Decimal
 from datetime import datetime
 from core.config import config
+from dto.responses.currency_response import ConversionMetadata, CurrencyResponse
 
 class AlphaVantageConverter:
     """Handler untuk konversi mata uang menggunakan AlphaVantage API
@@ -25,52 +27,85 @@ class AlphaVantageConverter:
         self.api_key = config.ALPHA_VANTAGE_KEY
         self.base_currency = "USD"  # Mata uang dasar untuk cross-rate
 
-    def get_rates(self, from_curr: str="USD", to_curr: str="JPY", amount: float = 1.0) -> Dict:
-        """Mendapatkan rate konversi dan jumlah terkonversi
+    # def get_rates(self, from_curr: str, to_curr: str, amount: float = 1.0) -> Dict:
+    #     """Mendapatkan rate konversi dan jumlah terkonversi
         
-        Args:
-            from_curr: Kode mata uang asal (3 huruf)
-            to_curr: Kode mata uang tujuan (3 huruf)
-            amount: Jumlah yang akan dikonversi
+    #     Args:
+    #         from_curr: Kode mata uang asal (3 huruf)
+    #         to_curr: Kode mata uang tujuan (3 huruf)
+    #         amount: Jumlah yang akan dikonversi
             
-        Returns:
-            Dict berisi:
-            - base_rate: Rate langsung dari API
-            - calculated_rate: Rate akhir yang digunakan
-            - converted_amount: Jumlah terkonversi
-            - is_cross_rate: True jika menggunakan cross-rate
-            - metadata: Info tambahan tentang sumber rate
-        """
+    #     Returns:
+    #         Dict berisi:
+    #         - base_rate: Rate langsung dari API
+    #         - calculated_rate: Rate akhir yang digunakan
+    #         - converted_amount: Jumlah terkonversi
+    #         - is_cross_rate: True jika menggunakan cross-rate
+    #         - metadata: Info tambahan tentang sumber rate
+    #     """
+    #     try:
+    #         # Coba dapatkan rate langsung
+    #         direct_rate = self._get_direct_rate(from_curr, to_curr)
+    #         return self._build_response(
+    #             direct_rate, 
+    #             from_curr, 
+    #             to_curr, 
+    #             amount,
+    #             is_cross_rate=False
+    #         )
+    #     except Exception as e:
+    #         # Fallback ke cross-rate via USD
+    #         usd_rate1 = self._get_direct_rate(from_curr, self.base_currency)
+    #         usd_rate2 = self._get_direct_rate(self.base_currency, to_curr)
+    #         calculated_rate = usd_rate1 * usd_rate2
+            
+    #         return self._build_response(
+    #             calculated_rate,
+    #             from_curr,
+    #             to_curr,
+    #             amount,
+    #             is_cross_rate=True,
+    #             metadata={
+    #                 'base_currency': self.base_currency,
+    #                 'components': {
+    #                     f"{from_curr}_{self.base_currency}": usd_rate1,
+    #                     f"{self.base_currency}_{to_curr}": usd_rate2
+    #                 }
+    #             }
+    #         )
+
+    def get_rates(self, from_curr: str, to_curr: str, amount: float) -> CurrencyResponse:
         try:
-            # Coba dapatkan rate langsung
             direct_rate = self._get_direct_rate(from_curr, to_curr)
-            return self._build_response(
-                direct_rate, 
-                from_curr, 
-                to_curr, 
-                amount,
-                is_cross_rate=False
+            return CurrencyResponse.from_conversion(
+                amount=Decimal(str(amount)),
+                rate=direct_rate,
+                currency_pair=f"{from_curr}_{to_curr}",
+                method='api',
+                source='alphavantage'
             )
         except Exception as e:
-            # Fallback ke cross-rate via USD
             usd_rate1 = self._get_direct_rate(from_curr, self.base_currency)
             usd_rate2 = self._get_direct_rate(self.base_currency, to_curr)
             calculated_rate = usd_rate1 * usd_rate2
             
-            return self._build_response(
-                calculated_rate,
-                from_curr,
-                to_curr,
-                amount,
-                is_cross_rate=True,
-                metadata={
-                    'base_currency': self.base_currency,
-                    'components': {
-                        f"{from_curr}_{self.base_currency}": usd_rate1,
-                        f"{self.base_currency}_{to_curr}": usd_rate2
+            return CurrencyResponse.from_conversion(
+                amount=Decimal(str(amount)),
+                rate=calculated_rate,
+                currency_pair=f"{from_curr}_{to_curr}",
+                method='api',
+                source='alphavantage',
+                metadata=ConversionMetadata(
+                    method='api',
+                    currency_pair=f"{from_curr}_{to_curr}",
+                    base_currency=self.base_currency,
+                    components={
+                        f"{from_curr}_{self.base_currency}": float(usd_rate1),
+                        f"{self.base_currency}_{to_curr}": float(usd_rate2)
                     }
-                }
+                )
             )
+        
 
     def _get_direct_rate(self, from_curr: str, to_curr: str) -> Decimal:
         """Mendapatkan rate langsung dari API"""
@@ -109,6 +144,6 @@ class AlphaVantageConverter:
                 "from_currency": from_curr,
                 "to_currency": to_curr,
                 "rate_used": float(rate),
-                "timestamp": datetime.utcnow().isoformat(timespec='seconds') + "Z"  # UTC time sesuai ISO 8601
+                "timestamp": datetime.now().isoformat()  # Fallback ke waktu lokal
             }
         }

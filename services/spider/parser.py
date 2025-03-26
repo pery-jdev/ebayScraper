@@ -1,8 +1,9 @@
 import re
 
 from typing import Any
+from xml.etree.ElementTree import ParseError
 from bs4 import BeautifulSoup
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP, DecimalException
 
 from services.spider.errors.xe import XEParserError
 from dto.responses.currency_response import CurrencyResponse
@@ -121,33 +122,81 @@ class XeParser:
 
     
 
-    def parse_rate(self, soup: BeautifulSoup) -> CurrencyResponse:
-        conversion = soup.find('div', attrs={'class': '[grid-area:conversion]'}).find_all('p')
-        amount = conversion[0].text.strip()
-        converted_amount = conversion[1].text.strip()
-        base_rate = conversion[2].text.strip()
-        # dst_rate = conversion[3].text.strip()
-        currency_match = re.search(r'(\b[A-Z]{3}\b).*?(\b[A-Z]{3}\b)', base_rate)
+    # def parse_rate(self, soup: BeautifulSoup) -> CurrencyResponse:
+    #     conversion = soup.find('div', attrs={'class': '[grid-area:conversion]'}).find_all('p')
+    #     amount = conversion[0].text.strip()
+    #     converted_amount = conversion[1].text.strip()
+    #     base_rate = conversion[2].text.strip()
+    #     # dst_rate = conversion[3].text.strip()
+    #     currency_match = re.search(r'(\b[A-Z]{3}\b).*?(\b[A-Z]{3}\b)', base_rate)
        
-        # parsing
+    #     # parsing
 
-        amount = Decimal(re.sub(r'[^\d.]', '', amount))
-        result = Decimal(re.sub(r'[^\d.]', '', converted_amount))
-        rate = Decimal(re.sub(r'[^\d.]', '', base_rate.split('=')[1]))
+    #     amount = Decimal(re.sub(r'[^\d.]', '', amount))
+    #     result = Decimal(re.sub(r'[^\d.]', '', converted_amount))
+    #     rate = Decimal(re.sub(r'[^\d.]', '', base_rate.split('=')[1]))
 
-        currency_pair = f"{currency_match.group(1)}_{currency_match.group(2)}"
+    #     currency_pair = f"{currency_match.group(1)}_{currency_match.group(2)}"
 
-        #  Ekstrak pasangan mata uang
-        return CurrencyResponse.from_conversion(
-            amount=amount,
-            rate=rate,
-            currency_pair=currency_pair,
-            method='web_scraping'
-        )
+    #     #  Ekstrak pasangan mata uang
+    #     return CurrencyResponse.from_conversion(
+    #         amount=amount,
+    #         rate=rate,
+    #         currency_pair=currency_pair,
+    #         method='web_scraping'
+    #     )
 
-        # print(f"ammount: {amount}|| converted_amount: {converted_amount}|| base_rate: {base_rate}|| dst_rate: {dst_rate}") # print(converted_amount, '||', amount, '||', base_rate, '||', dst_rate)
+    #     # print(f"ammount: {amount}|| converted_amount: {converted_amount}|| base_rate: {base_rate}|| dst_rate: {dst_rate}") # print(converted_amount, '||', amount, '||', base_rate, '||', dst_rate)
 
 
+    def parse_rate(self, soup: BeautifulSoup) -> CurrencyResponse:
+        """Parse currency conversion data from XE.com HTML content
+        
+        Args:
+            soup: BeautifulSoup instance of XE.com conversion page
+            
+        Returns:
+            CurrencyResponse with parsed conversion data
+            
+        Raises:
+            ParseError: If any required data elements are missing
+            ValueError: If numeric parsing fails
+        """
+        conversion = soup.find('div', attrs={'class': '[grid-area:conversion]'})
+        if not conversion:
+            raise ParseError("Conversion container not found")
+            
+        paragraphs = conversion.find_all('p')
+        if len(paragraphs) < 4:
+            raise ParseError("Insufficient conversion data paragraphs")
 
-    
+        try:
+            # Parse numeric values
+            amount_str = paragraphs[0].text.strip()  # Format: "100.00 USD"
+            result_str = paragraphs[1].text.strip()  # Format: "14,800.00 JPY" 
+            rate_str = paragraphs[2].text.strip()    # Format: "1 USD = 148.00 JPY"
+            
+            # Extract currency codes using improved regex
+            currency_match = re.search(r'(\b[A-Z]{3}\b).*?(\b[A-Z]{3}\b)', rate_str)
+            if not currency_match:
+                raise ParseError("Currency pair pattern not found")
+                
+            currency_pair = f"{currency_match.group(1)}_{currency_match.group(2)}"
+
+            # Clean and convert numeric values
+            amount = Decimal(re.sub(r'[^\d.]', '', amount_str))
+            result = Decimal(re.sub(r'[^\d.]', '', result_str))
+            rate = Decimal(re.sub(r'[^\d.]', '', rate_str.split('=')[1]))
+
+            return CurrencyResponse.from_conversion(
+                amount=amount,
+                rate=rate,
+                currency_pair=currency_pair,
+                method='web_scraping'
+            )
+            
+        except (IndexError, DecimalException, AttributeError) as e:
+            raise ParseError(f"Error parsing conversion data: {str(e)}") from e
+
+        
 

@@ -1,5 +1,7 @@
+from decimal import Decimal
 import logging
 import time
+from dto.responses.currency_response import CurrencyResponse
 from services.pricing.alphavantage_converter import AlphaVantageConverter
 from services.spider.xe import XeSpider
 
@@ -26,9 +28,24 @@ class CurrencyConverter(object):
                 
         return self._fallback_to_xe(from_curr, to_curr)
         
-    def _fallback_to_xe(self, from_curr, to_curr):
+    def _fallback_to_xe(self,  from_curr, to_curr):
         try:
-            return self.xe.get_rate(from_curr, to_curr)
+            return self.xe.scrape_rate(from_curr, to_curr)
         except Exception as e:
             logging.error("XE fallback failed")
             raise ValueError("All conversion methods failed") from e
+
+    def convert_currency(self, from_curr: str, to_curr: str, amount: float) -> CurrencyResponse:
+        try:
+            # Try API first
+            return self.av.get_rates(from_curr, to_curr, amount)
+        except Exception as api_error:
+            # Fallback to web scraping
+            xe_rate = self.xe.scrape_rate(from_curr=from_curr, to_curr=to_curr, ammount=amount)
+            return CurrencyResponse.from_conversion(
+                amount=Decimal(str(amount)),
+                rate=xe_rate,
+                currency_pair=f"{from_curr}_{to_curr}",
+                method='web_scraping',
+                source='xe.com'
+            )

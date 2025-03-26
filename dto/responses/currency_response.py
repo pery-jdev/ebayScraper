@@ -1,6 +1,7 @@
+import datetime
+
 from decimal import Decimal
 from typing import Literal
-import datetime
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 class ConversionMetadata(BaseModel):
@@ -58,22 +59,17 @@ class CurrencyResponse(BaseModel):
         return round(v, 6)
 
     @classmethod
+    @classmethod
     def from_conversion(
         cls,
         amount: Decimal,
         rate: Decimal,
         currency_pair: str,
-        method: Literal['web_scraping', 'api'] = 'web_scraping'
+        method: Literal['web_scraping', 'api'],
+        source: str  # Added source parameter
     ) -> 'CurrencyResponse':
-        """Factory method to create response from conversion data
-        
-        Args:
-            amount: Amount to convert
-            rate: Exchange rate used
-            currency_pair: Currency pair
-            method: Data retrieval method
-        """
         return cls(
+            source=source,
             base_rate=float(rate.quantize(Decimal('0.000001'))),
             result=float((amount * rate).quantize(Decimal('0.00'))),
             metadata=ConversionMetadata(
