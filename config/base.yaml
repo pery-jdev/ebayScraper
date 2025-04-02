@@ -24,13 +24,38 @@ translation:
     batch_size: 10
     max_workers: 4
     timeout_per_text: 5
-curency:
+currency:
   alphavantage_api_key: 3DZJ2PEPJ59TV5W7
   alphavantage_url: https://www.alphavantage.co
   provider: "alpha_vantage" # atau "ecb"
   refresh_interval: 900 # 15 menit
 
 currency_conversion:
-  max_retries: 3
-  retry_delay: 2
   fallback_order: ["alphavantage", "xe"]
+
+optimization:
+  evolutionary:
+    base_iterations: 40
+    max_iterations: 150
+    mutation_rate: 0.4
+    timeout: 600
+  currency_weights:
+    USD: 0.6
+    AUD: 0.4
+
+    
+  population:
+    base_size: 30
+    max_size: 100
+    scaling_factor: 0.0075
+    
+  thresholds:
+    min_products: 6
+    max_retries: 3
+
+pricing:
+  target_currencies: ["USD", "AUD"]
+  min_totals:
+    USD: 75
+    AUD: 110
+  conversion_rate_ttl: 3600

@@ -7,6 +7,7 @@ class Config:
         self.BASE_DIR = Path(__file__).resolve().parent.parent
         self.config = self._load_config()
         
+        
     def _load_config(self):
     # Load base config
         base_path = self.BASE_DIR / 'config' / 'base.yaml'
@@ -38,7 +39,7 @@ class Config:
         self.TRANSLATION = config['translation']
         
         # Set currency config
-        self.ALPHA_VANTAGE_KEY = config['curency']['alphavantage_api_key']
+        self.ALPHA_VANTAGE_KEY = config['currency']['alphavantage_api_key']
         
         return config
 

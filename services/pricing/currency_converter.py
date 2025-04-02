@@ -28,7 +28,14 @@ class CurrencyConverter(object):
                 time.sleep(self.retry_delay * (attempt + 1))
                 
         return self._fallback_to_xe(from_curr, to_curr)
-        
+    def get_cached_rates(self):
+        """Get last successful rates from cache"""
+        return self.cache.get('last_rates') 
+
+    def get_historical_average(self, days):
+        """Calculate average from historical data"""
+        return self.db.query_historical(days)
+            
     def _fallback_to_xe(self,  from_curr, to_curr):
         try:
             return self.xe.scrape_rate(from_curr, to_curr)
