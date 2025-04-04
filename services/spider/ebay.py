@@ -32,4 +32,5 @@ class EbaySpider(object):
         # response = self.response.get_response(url=url, mode="selenium")
         f = open(cfg.TEMP_DIR / "response.html", "r")
         soup = BeautifulSoup(f.read(), "html.parser")
-        self.parser.parse_product_details(soup=soup)
+        product = self.parser.parse_product_details(soup=soup)
+        return product
