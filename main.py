@@ -4,7 +4,7 @@ from services.pricing.currency_converter import CurrencyConverter
 from services.spider.xe import XeSpider
 from dto.requests.product_request import ProductRequest
 
-from manager.product_manager import ProductManager
+from manager.product_manager import EbayProductManager
 
 def test_converter():
     # alpha = AlphaVantageConverter()
@@ -185,7 +185,7 @@ def test_product():
     print(products)
 
 def test_scraper():
-    product_manager = ProductManager()
+    product_manager = EbayProductManager()
     products = product_manager.get_products()
     print(products)
 

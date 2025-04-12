@@ -26,6 +26,9 @@ class PageLoader(object):
             self.wait_for_jquery()
             self.wait_for_angular()
             self.wait_for_network_idle()
+            # bypass as capcha here
+            
+            time.sleep(2)
             
             return True
         except TimeoutException:

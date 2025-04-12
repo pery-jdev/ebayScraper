@@ -34,6 +34,7 @@ class Config:
         
         # Set debug mode
         self.DEBUG = config['base']['debug']
+        print(self.DEBUG)
         
         # Set translation config
         self.TRANSLATION = config['translation']

@@ -4,6 +4,8 @@ from web.app.routers import router as EbayAppRouter
 
 def create_app() -> FastAPI:
     app: FastAPI = FastAPI()
+    
     app.include_router(EbayAPIRouter)
     app.include_router(EbayAppRouter)
+
     return app

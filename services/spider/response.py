@@ -7,9 +7,6 @@ from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 
 from webdriver_manager.chrome import ChromeDriverManager
@@ -19,12 +16,14 @@ from urllib.parse import urlencode
 
 from core.config import config as cfg
 from services.spider.utils.selenium_page_loader import PageLoader
+from services.spider.utils.selenium_options import SeleniumOptions
 
 
 class SpiderResponse(object):
     def __init__(self):
         self.session: requests.Session = requests.Session()
         self.modes = ["selenium", "requests", "httpx"]
+        self.options: SeleniumOptions = SeleniumOptions()
 
     def get_response(
         self,
@@ -67,6 +66,7 @@ class SpiderResponse(object):
                 return BeautifulSoup(res.text, "html.parser")
         elif mode == "selenium":
             # formatted url here
+            options = self.options.get_chrome_options()
 
             try:
                 url = f"{url}{urlencode(params)}"
@@ -74,6 +74,7 @@ class SpiderResponse(object):
                 pass
             print(f"Requesting url use selenium: {url}")
             driver = webdriver.Chrome(
+                options=options,
                 service=ChromeService(
                     ChromeDriverManager(
                         cache_manager=DriverCacheManager(cfg.DRIVER_PATH)

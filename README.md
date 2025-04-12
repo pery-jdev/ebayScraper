@@ -1,6 +1,7 @@
 # Fishing Lure International Bundling System (FLIBS)
 
 ## System Overview
+
 ```mermaid
 graph TD
     A[Japanese CSV Input] --> B[Translation Module]
@@ -13,21 +14,24 @@ graph TD
 ```
 
 ## Key Features
+
 - Multi-source Price Integration (API + Web Scraping)
 - Smart Bundle Allocation Algorithm
 - Multi-currency Financial Analysis
 - Automated Reporting System
 
 ## Implementation Status
-| Module | Progress | Tech Stack |
-|--------|----------|------------|
-| Core Engine | 90% | Python 3.10, Pandas |
-| Translation | 60% | Google Cloud API |
-| Pricing | 45% | Scrapy, Requests |
-| API Layer | 10% | FastAPI |
-| Web UI | 0% | ReactJS |
+
+| Module      | Progress | Tech Stack          |
+| ----------- | -------- | ------------------- |
+| Core Engine | 90%      | Python 3.10, Pandas |
+| Translation | 60%      | Google Cloud API    |
+| Pricing     | 45%      | Scrapy, Requests    |
+| API Layer   | 10%      | FastAPI             |
+| Web UI      | 0%       | ReactJS             |
 
 ## Getting Started
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -37,4 +41,5 @@ python main.py --input data/product.csv
 ```
 
 ## Documentation
+
 See detailed technical specifications in `docs/` directory

@@ -1,9 +1,10 @@
 from services.spider.ebay import EbaySpider
-class ProductManager:
+class EbayProductManager:
     def __init__(self):
         self.ebay_spider = EbaySpider()
 
     def get_products(self):
-        products = self.ebay_spider.get_product_details(url="https://www.ebay.com.au/itm/334297884748?_skw=fishing+tackle&itmmeta=01JPC6BV5WVS041V4C7SC1K37M&hash=item4dd5b4e84c:g:fr8AAOSwcZxh6LVE&itmprp=enc%3AAQAKAAAA0FkggFvd1GGDu0w3yXCmi1cEtL%2FSUwtIyX9I5WDhXP25uUxZZR0mNH1sdMhBwq%2FxeQT2hcPQAyt3Ofb63wTFxnGJVBh7PdyqCTOm9Lxwom8F1LSYWTimYhBQopBuZfbJ0EuJUSwpgbz2TrEP4t%2BUGkqUYPeDsONHKw0qNaRr3z2EcAt5mihLcyN%2FHGM8jTcM2P0RdBP%2FGTjJ6KMT5oDiAeGVrPX88FqVdu%2BJFF8AcOsLLZV4muuPPph%2F10eeFDmN7rPss69u0KXWfD9c%2BySyekU%3D%7Ctkp%3ABlBMUJSzr4azZQ")
+        # products = self.ebay_spider.get_product_details(url="https://www.ebay.com.au/itm/396276693896?_skw=lure+fishing&itmmeta=01JR0SA1V95H9PF6MJ3HCRF59Q&hash=item5c43ee7b88:g:OJ4AAOSwH8pnxwrZ&itmprp=enc%3AAQAKAAAA4FkggFvd1GGDu0w3yXCmi1d5CZW3WPA3N30fgZQvnvltFOvbkBFJv%2BSez4DTMylbx0wPpZpj01VVhXFGc%2B0Ziv8SZt8z%2BZkoRD65%2B9hfq0D0pFg7IowUplBonsgF%2BtKQdTfYrcwSClAl1nAHmcHlM3j9SSYrIiRKiO49Q%2FtjrqmoWuJvR2YErF09mqTsWdcpZ2CPzJpAiEDqZfYDbR02gFJ5O2VTMVYXS7T%2B%2BrPnBPf0kFTg6UvbBEevwvPUHJypYzofl3sUxXYRmeaOX0kpRmrB0dX6opmpBbMXRkKCIoOA%7Ctkp%3ABFBM-p2omcBl")
+        # return products
+        products = self.ebay_spider.generate_products(query="Fishing Lures")
         print(products)
-        return products
