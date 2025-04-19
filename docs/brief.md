@@ -42,32 +42,66 @@ This document summarizes the current implementation status of the Python script 
     *   Bundle products.
     *   Write final CSV.
 3.  **Refine Implementations:**
-    *   **Translation:** Decide: Use official Google Cloud API or keep current libraries?
-    *   **Price Fetching:** Decide: Implement APIs (eBay, Amazon, etc.) or expand scraping? Implement chosen methods for *all* required sources. Update eBay scraper to use dynamic queries.
+    *   **Translation:** Decide: Use official Google Cloud API or keep current libraries? (Assuming current libraries for now)
+    *   **Price Fetching:** Decide: Implement APIs (eBay, Amazon, etc.) or expand scraping? (Assuming expanding scraping for now). Implement chosen methods for *all* required sources. Update eBay scraper to use dynamic queries.
     *   **Output:** Modify `save_to_csv` for the required format (translated names, individual prices).
 
-## Workflow Diagram
+## Detailed Workflow Diagram
 
 ```mermaid
 flowchart TD
-    A[Start] --> B{Read Input CSV};
-    B --> C{Loop Through Products};
-    C --> D[Translate Name (JP -> EN)];
-    D --> E{Fetch Prices (USD/AUD)};
-    subgraph E [Price Fetching]
+    A[Start main.py] --> B(Load Lures);
+    subgraph B [Load Lures from CSV]
         direction LR
-        E1{Attempt APIs?}
-        E1 -- Yes --> E2[Use eBay/Amazon/... API Clients]
-        E1 -- No/Fallback --> E3[Use Scrapers (eBay/JapanTackle/...)]
-        E2 --> E4[Store Prices]
-        E3 --> E4
+        B1[main.load_lures_from_csv] --> B2{"Read data/product.csv"};
+        B2 --> B3["Create List[LureData]"];
     end
-    E --> F[Store Translated Name & Prices];
-    F --> C;
-    C -- End Loop --> G[Pass Products to Bundle Engine];
-    G --> H{Generate Bundles & Leftovers};
-    H --> I[Format Output Data];
-    I --> J{Write Output CSV};
-    J --> K[End];
 
-    style E subgraph fill:#f9f,stroke:#333,stroke-width:2px
+    B --> C{Process Each Lure};
+    C -- For Each LureData --> D(Translate Name);
+    subgraph D [Translate Name]
+        direction LR
+        D1[services.translations.MultiTranslator.translate_text] --> D2["Update LureData.name_en"];
+    end
+
+    D --> E(Fetch Prices);
+    subgraph E [Fetch Prices (USD/AUD)]
+        direction LR
+        E1{Use APIs?}
+        E1 -- Yes --> E2[API Clients (eBay, Amazon...)]
+        E1 -- No/Fallback --> E3[Web Scrapers];
+        subgraph E3 [Web Scrapers]
+            E3a[services.spider.EbaySpider.get_products(query=LureData.name_en)]
+            E3b[...]
+            E3c[Other Scrapers (JapanTackle...)]
+        end
+        E2 --> E4{Parse Prices}
+        E3 --> E4
+        E4 --> E5[services.pricing.CurrencyConverter (if needed)]
+        E5 --> E6["Update LureData.price_map{'USD': ..., 'AUD': ...}"]
+    end
+
+    E --> C;
+    C -- End Loop --> F(Pass Processed Lures);
+    F -- List[LureData] --> G(Generate Bundles);
+    subgraph G [Generate Bundles]
+        direction LR
+        G1[services.bundles.BundleEngine.__init__(products=List[LureData])] --> G2[BundleEngine.generate_bundles];
+        G2 --> G3["Validate Bundles (check rules)"];
+        G3 --> G4["Return (valid_bundles, leftovers)"];
+    end
+
+    G --> H(Save Report);
+    subgraph H [Save Report]
+        direction LR
+        H1[services.bundles.BundleEngine.save_to_csv] --> H2{"Format Data (Names, Prices, etc.)"};
+        H2 --> H3["Write data/bundles_report.csv"];
+    end
+
+    H --> I[End];
+
+    style B subgraph fill:#lightblue,stroke:#333,stroke-width:2px
+    style D subgraph fill:#lightgreen,stroke:#333,stroke-width:2px
+    style E subgraph fill:#lightcoral,stroke:#333,stroke-width:2px
+    style G subgraph fill:#lightyellow,stroke:#333,stroke-width:2px
+    style H subgraph fill:#lightgrey,stroke:#333,stroke-width:2px
