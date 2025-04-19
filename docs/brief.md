@@ -46,56 +46,36 @@ This document summarizes the current implementation status of the Python script 
     *   **Price Fetching:** Decide: Implement APIs (eBay, Amazon, etc.) or expand scraping? (Assuming expanding scraping for now). Implement chosen methods for *all* required sources. Update eBay scraper to use dynamic queries.
     *   **Output:** Modify `save_to_csv` for the required format (translated names, individual prices).
 
-## Detailed Workflow Diagram
+## Detailed Workflow Diagram (Simplified)
 
 ```mermaid
 flowchart TD
-    A[Start main.py] --> B(Load Lures);
-    subgraph B [Load Lures from CSV]
-        direction LR
-        B1[main.load_lures_from_csv] --> B2{"Read data/product.csv"};
-        B2 --> B3["Create List[LureData]"];
-    end
+    A[Start main.py] --> B1(main.load_lures_from_csv);
+    B1 --> B2{"Read data/product.csv"};
+    B2 --> B3["Create List[LureData]"];
+    B3 --> C{Process Each Lure};
 
-    B --> C{Process Each Lure};
-    C -- For Each LureData --> D(Translate Name);
-    subgraph D [Translate Name]
-        direction LR
-        D1[services.translations.MultiTranslator.translate_text] --> D2["Update LureData.name_en"];
-    end
+    C -- For Each LureData --> D1[services.translations.MultiTranslator.translate_text];
+    D1 --> D2["Update LureData.name_en"];
 
-    D --> E(Fetch Prices);
-    subgraph E [Fetch Prices (USD/AUD)]
-        direction LR
-        E1{Use APIs?} --> E_API[API Clients (eBay, Amazon...)]
-        E1 -- No/Fallback --> E_Scrape[Web Scrapers (eBay, JapanTackle...)];
-        E_API --> E_Parse{Parse Prices}
-        E_Scrape --> E_Parse
-        E_Parse --> E_Convert[services.pricing.CurrencyConverter (if needed)]
-        E_Convert --> E_Update["Update LureData.price_map{'USD': ..., 'AUD': ...}"]
-    end
+    D2 --> E1{Use APIs?};
+    E1 -- Yes --> E_API[API Clients (eBay, Amazon...)];
+    E1 -- No/Fallback --> E_Scrape[Web Scrapers (eBay, JapanTackle...)];
+    E_API --> E_Parse{Parse Prices};
+    E_Scrape --> E_Parse;
+    E_Parse --> E_Convert[services.pricing.CurrencyConverter (if needed)];
+    E_Convert --> E_Update["Update LureData.price_map{'USD': ..., 'AUD': ...}"];
 
-    E --> C;
-    C -- End Loop --> F(Pass Processed Lures);
-    F -- List[LureData] --> G(Generate Bundles);
-    subgraph G [Generate Bundles]
-        direction LR
-        G1[services.bundles.BundleEngine.__init__(products=List[LureData])] --> G2[BundleEngine.generate_bundles];
-        G2 --> G3["Validate Bundles (check rules)"];
-        G3 --> G4["Return (valid_bundles, leftovers)"];
-    end
+    E_Update --> C;
 
-    G --> H(Save Report);
-    subgraph H [Save Report]
-        direction LR
-        H1[services.bundles.BundleEngine.save_to_csv] --> H2{"Format Data (Names, Prices, etc.)"};
-        H2 --> H3["Write data/bundles_report.csv"];
-    end
+    C -- End Loop --> F[Pass Processed Lures List[LureData]];
 
-    H --> I[End];
+    F --> G1[services.bundles.BundleEngine.__init__];
+    G1 --> G2[BundleEngine.generate_bundles];
+    G2 --> G3["Validate Bundles (check rules)"];
+    G3 --> G4["Return (valid_bundles, leftovers)"];
 
-    style B subgraph fill:#lightblue,stroke:#333,stroke-width:2px
-    style D subgraph fill:#lightgreen,stroke:#333,stroke-width:2px
-    style E subgraph fill:#lightcoral,stroke:#333,stroke-width:2px
-    style G subgraph fill:#lightyellow,stroke:#333,stroke-width:2px
-    style H subgraph fill:#lightgrey,stroke:#333,stroke-width:2px
+    G4 --> H1[services.bundles.BundleEngine.save_to_csv];
+    H1 --> H2{"Format Data (Names, Prices, etc.)"};
+    H2 --> H3["Write data/bundles_report.csv"];
+    H3 --> I[End];
