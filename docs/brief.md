@@ -67,19 +67,12 @@ flowchart TD
     D --> E(Fetch Prices);
     subgraph E [Fetch Prices (USD/AUD)]
         direction LR
-        E1{Use APIs?}
-        E1 -- Yes --> E2[API Clients (eBay, Amazon...)]
-        E1 -- No/Fallback --> E3(Web Scrapers);
-            subgraph E3 [Web Scrapers]
-                direction TB
-                E3a[services.spider.EbaySpider.get_products(query=LureData.name_en)]
-                E3b[...]
-                E3c[Other Scrapers (JapanTackle...)]
-            end
-        E2 --> E4{Parse Prices}
-        E3 --> E4
-        E4 --> E5[services.pricing.CurrencyConverter (if needed)]
-        E5 --> E6["Update LureData.price_map{'USD': ..., 'AUD': ...}"]
+        E1{Use APIs?} --> E_API[API Clients (eBay, Amazon...)]
+        E1 -- No/Fallback --> E_Scrape[Web Scrapers (eBay, JapanTackle...)];
+        E_API --> E_Parse{Parse Prices}
+        E_Scrape --> E_Parse
+        E_Parse --> E_Convert[services.pricing.CurrencyConverter (if needed)]
+        E_Convert --> E_Update["Update LureData.price_map{'USD': ..., 'AUD': ...}"]
     end
 
     E --> C;
