@@ -44,7 +44,7 @@ class EbayParser:
             - Sets default vendor as 'eBay'
         """
 
-        products_container = soup.find("ul", class_="srp-results srp-list clearfix")
+        products_container = soup.find("ul", attrs={"class": "srp-results srp-list clearfix"})
         if not products_container:
             return []
 

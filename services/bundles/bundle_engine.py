@@ -20,10 +20,10 @@ class BundleEngine:
 
         return (
             len(bundle) == 6
-            and total_usd >= 85  # Meningkatkan threshold USD
-            and total_aud >= 120  # Meningkatkan threshold AUD
-            and 800 <= avg_cost <= 880  # Memperketat range biaya
-            and profit_margin >= 25  # Minimal $25 profit per bundle
+            and total_usd >= 75  # Original requirement: $75 USD
+            and total_aud >= 110  # Original requirement: $110 AUD
+            and 800 <= avg_cost <= 880  # Memperketat range biaya (Keeping this range as it aligns with 'around 850 yen')
+            and profit_margin >= 25  # Minimal $25 profit per bundle (Keeping this potentially added rule)
         )
 
     def generate_bundles(
