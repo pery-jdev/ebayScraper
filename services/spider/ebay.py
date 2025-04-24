@@ -36,6 +36,27 @@ class EbaySpider(object):
         product = self.parser.parse_product_details(soup=soup)
         return product
     
-    def generate_products(self, query: str):
+    def generate_products(self, query: str, category: str = None):
         products = self.get_products(query=query)
-        return products
+        
+        # Tambahkan category jika ada
+        if category:
+            for product in products:
+                product['category'] = category
+                
+        # Format produk sesuai kebutuhan API
+        formatted_products = []
+        for product in products:
+            formatted_products.append({
+                'id': product.get('id'),
+                'name': product.get('name'),
+                'name_en': product.get('name_en', ''),
+                'price_yen': product.get('price_yen', 0),
+                'price_usd': product.get('price_usd', 0),
+                'price_aud': product.get('price_aud', 0),
+                'url': product.get('url', ''),
+                'bundle_group': product.get('bundle_group', ''),
+                'category': product.get('category', '')
+            })
+            
+        return formatted_products
