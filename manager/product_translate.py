@@ -15,14 +15,13 @@ class ProductTranslateManager:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
 
-    def translate_product(self, columns: Optional[List[str]] = None):
+    def translate_product(self, products: pd.DataFrame, columns: Optional[List[str]] = None):
         try:
-            products = self.file_processor.read_csv("product.csv")
-            products = self.data_processor.remove_duplicates(products)
-
-            if products is None:
-                self.logger.error("Failed to read input file")
+            if products is None or products.empty:
+                self.logger.error("Invalid input products DataFrame")
                 return None
+                
+            products = self.data_processor.remove_duplicates(products)
             
             # create new dataframe to Accommodate new products
             translated_products = products.copy()
