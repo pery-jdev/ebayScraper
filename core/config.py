@@ -1,9 +1,12 @@
 from pathlib import Path
 import yaml
 import os
+from dotenv import load_dotenv
 
 class Config:
     def __init__(self):
+        # Load environment variables from .env file
+        load_dotenv()
         self.BASE_DIR = Path(__file__).resolve().parent.parent
         self.config = self._load_config()
         
@@ -39,8 +42,8 @@ class Config:
         # Set translation config
         self.TRANSLATION = config['translation']
         
-        # Set currency config
-        self.ALPHA_VANTAGE_KEY = config['currency']['alphavantage_api_key']
+        # Set currency config with env var fallback
+        self.ALPHA_VANTAGE_KEY = os.getenv('ALPHAVANTAGE_API_KEY', config['currency']['alphavantage_api_key'])
         
         return config
 
