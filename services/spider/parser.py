@@ -3,12 +3,12 @@ import re
 from typing import Any
 from xml.etree.ElementTree import ParseError
 from bs4 import BeautifulSoup
-from decimal import Decimal, ROUND_HALF_UP, DecimalException
+from decimal import Decimal, DecimalException
 
-from services.spider.errors.xe import XEParserError
 from dto.responses.currency_response import CurrencyResponse
-from dto.requests.product_request import ProductRequest
+from dto.requests.product_request_sdc import ProductRequestSDC as ProductRequest
 from services.spider.utils.xe_formatter import XeFormatter
+from services.processors.data_processor import DataProcessor
 
 
 class EbayParser:
@@ -28,8 +28,10 @@ class EbayParser:
 
     def __init__(self):
         self.product_lists: list[ProductRequest] = []
+        self.data_processor = DataProcessor()
 
-    def parse_products(self, soup: BeautifulSoup) -> list[ProductRequest]:
+    def parse_products(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        products: list[dict[str, Any]] = []
         """Parse product listings from search results page
 
         Args:
@@ -63,17 +65,20 @@ class EbayParser:
 
 
             vendor = "eBay"  # Default vendor
-            # print('type title: ', type(title), 'isinya: ', title)
-            self.product_lists.append(
-                ProductRequest(
-                
-                )
-            )
-            print(self.product_lists)
+            data_dict: dict[str, Any] = {
+                "handle": product_url,
+                "title": title,
+                "vendor": vendor,
+                "variant_price": price,
+                "image_src": image_url,
+                "product_url": product_url
+            }
 
-        return self.product_lists
+            products.append(data_dict)
 
-    def parse_product_details(self, soup: BeautifulSoup) -> dict[str, Any]:
+        return products
+
+    def parse_product_details(self, soup: BeautifulSoup) -> ProductRequest:
         """Parse detailed product information from product page
 
         Args:
@@ -89,40 +94,45 @@ class EbayParser:
         Raises:
             AttributeError: If required elements are missing
         """
-        products: dict[str, Any] = {}
-        product_image_lists: list[dict[str, str]] = []
+        product_details: dict[str, str] = {}
+
 
         body = soup.find("div", attrs={"class": "tabs__content"})
+        body_html = str(body) if body else None
 
         # prices
+        prices_list = []
         prices = soup.find("div", attrs={"data-testid": "x-bin-price"})
+        price_primary = None
+        if prices:
+            try:
+                price_primary = prices.find("div", attrs={"class": "x-price-primary"}).text.strip()
+                price_primary = self.data_processor.extract_price(price_primary)
+            except AttributeError:
+                price_primary = ""
+
+            try:
+                actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
+                actual_price = self.data_processor.extract_price(actual_price)
+            except AttributeError:
+                actual_price = ""
+
         try:
-            price_primary = prices.find(
-                "div", attrs={"class": "x-price-primary"}
-            ).text.strip()
-        except:
-            price_primary = ""
-        try:
-            actual_price = prices.find(
-                "div", attrs={"class": "x-additional-info__item--0"}
-            ).text.strip()
-        except:
-            actual_price = ""
-        try:
-            saving = prices.find(
-                "div", attrs={"class": "x-additional-info__item--1"}
-            ).text.strip()
-        except:
+            saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
+            saving = self.data_processor.extract_price(saving)
+        except AttributeError:
             saving = ""
 
-
-        prices_dict: dict[str, str] = {
-            "price_primary": price_primary,
-            "actual_price": actual_price,
-            "saving": saving,
+        product_details['prices'] = {
+            'price_primary': price_primary,
+            'actual_price': actual_price,
+            'saving': saving
         }
 
+
+
         # images
+        product_image_lists: list[str] = []
         try:
             images = soup.find("div", attrs={"data-testid": "x-photos"}).find_all(
                 "button", attrs={"class": "ux-image-grid-item"}
@@ -132,30 +142,32 @@ class EbayParser:
                     image_url = image.find("img")["src"]
                 except:
                     image_url = image.find("img")["data-src"]
+                try:
+                    image_alt = image.find("img")["alt"]
+                except:
+                    image_alt = ""
 
-                image_alt = image.find("img")["alt"]
-                if image_alt and image_url != None:
-                    product_image_lists.append(
-                        {"image_url": image_url, "image_alt": image_alt}
-                    )
+                image_data: dict[str, Any] = {
+                   "url": image_url,
+                   "alt": image_alt
+               }
+                product_image_lists.append(image_data)
         except:
             images = []
-        try:
-            # variant
-            variant_sku = (
-                soup.find(
-                    "div",
-                    attrs=[
-                        "class",
-                        "ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
-                    ],
-                )
-                .find("span", attrs={"class": "ux-textspans ux-textspans--BOLD"})
-                .text.strip()
-            )
-        except:
-            variant_sku = ""
 
+        # variant
+        try:
+            variant_sku = soup.find(
+                "div",
+                attrs=[
+                    "class",
+                    "ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
+                ],
+            ).find("span", attrs={"class": "ux-textspans ux-textspans--BOLD"}).text.strip()
+        except:
+            pass
+
+        
         try:
             items = soup.find(
                 "div", attrs={"class": "ux-layout-section-evo ux-layout-section--features"}
@@ -171,19 +183,30 @@ class EbayParser:
                     item_col_value = item_col.find(
                         "dd", attrs={"class": "ux-labels-values__values"}
                     )
-                    if item_col_label and item_col_value != None:
-                        products[item_col_label.text.strip()] = item_col_value.text.strip()
+                    if item_col_label and item_col_value:
+                        product_details[item_col_label.text.strip()] = item_col_value.text.strip()
         except:
             items = []
 
-            # print(item_label, item_value)
+        # product categories
+        product_category = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'}).find_all('li')
+        categories = ", ".join([category.find('a').text.strip() for category in product_category])
+        
+        product_data: dict[str, Any] = {
+            "body_html": body_html,
+            "image_src": product_image_lists[0]['url'],
+            "image_alt_text": product_image_lists[0]['alt'],
+            "vendor": product_details.get("Brand", ""),
+            "product_category": categories,
+            "variant_sku": variant_sku,
+            **product_details
+        }
+        return product_data
 
-        products["body"] = body
-        products["variant_sku"] = variant_sku
-        products["image_src"] = product_image_lists
-        products["variant_price"] = prices_dict
+        
 
-        return products
+        
+
 
 
 class XeParser:

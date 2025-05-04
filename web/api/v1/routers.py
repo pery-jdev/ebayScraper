@@ -1,11 +1,14 @@
+import pandas as pd
+import logging
+
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+
 from manager.product_manager import EbayProductManager
 from manager.product_translate import ProductTranslateManager
 from manager.currency_manager import CurrencyManager
 from services.processors.file_processor import FileProcessor
-import pandas as pd
-import logging
+
 
 router = APIRouter(prefix="/api")
 product_manager = EbayProductManager()
@@ -18,9 +21,9 @@ async def root():
     return {"message": "Hello World"}
 
 @router.post("/search")
-async def search_products(query: str = Form(...), category: str = Form(...)):
+async def search_products(query: str = Form(...), category: str = Form(None)):
     try:
-        products = product_manager.get_products()
+        products = product_manager.get_products(query=query, category=category)
         return JSONResponse(content=products, status_code=200)
     except Exception as e:
         logging.error(f"Search failed: {str(e)}")
@@ -85,3 +88,17 @@ async def convert_currency(
             content={"error": "Currency conversion failed"},
             status_code=500
         )
+    
+
+@router.post("/process")
+async def process_file(file: UploadFile = File(...)):
+
+    # read file
+    contents = await file.read()
+    df = pd.read_csv(contents)
+    return JSONResponse(content=df.to_dict('records'), status_code=200)
+
+@router.get("/detail")
+def test_detail():
+    data = product_manager.test_product_detail()
+    return JSONResponse(content=data, status_code=200)

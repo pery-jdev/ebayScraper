@@ -4,7 +4,7 @@ base:
     base: .
     temp: temp
     data: data
-    driver: temp/driver
+    driver: driver # driver directory
 
 translation:
   default_provider: alibaba
