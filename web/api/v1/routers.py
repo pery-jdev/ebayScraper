@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import JSONResponse
 
+from dto.requests.product_request_sdc import ProductDetailsRequestSDC as ProductDetailRequest
 from manager.product_manager import EbayProductManager
 from manager.product_translate import ProductTranslateManager
 from manager.currency_manager import CurrencyManager
@@ -101,4 +102,5 @@ async def process_file(file: UploadFile = File(...)):
 @router.get("/detail")
 def test_detail():
     data = product_manager.test_product_detail()
+    
     return JSONResponse(content=data, status_code=200)

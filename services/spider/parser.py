@@ -7,28 +7,16 @@ from decimal import Decimal, DecimalException
 
 from dto.responses.currency_response import CurrencyResponse
 from dto.requests.product_request_sdc import ProductRequestSDC as ProductRequest
+from dto.requests.product_request_sdc import ProductDetailsRequestSDC as ProductDetailRequest
 from services.spider.utils.xe_formatter import XeFormatter
-from services.processors.data_processor import DataProcessor
 
 
 class EbayParser:
     """Parser for eBay product listings and details
-
-    Maps eBay product data to ProductRequest DTO with the following key conversions:
-
-    | eBay Field            | DTO Field            | Transformation Needed          |
-    |-----------------------|----------------------|---------------------------------|
-    | product_sku           | handle               | Direct mapping                 |
-    | title                 | title                | Direct mapping                 |
-    | price_primary         | variant_price        | Convert currency string to float list |
-    | product_images[*].url | image_src            | Extract URLs from image dicts  |
-    | Brand (from details)  | vendor               | Extract from product attributes |
-    | Category (from details)| type                | Extract from product attributes |
     """
 
     def __init__(self):
         self.product_lists: list[ProductRequest] = []
-        self.data_processor = DataProcessor()
 
     def parse_products(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
         products: list[dict[str, Any]] = []
@@ -107,19 +95,19 @@ class EbayParser:
         if prices:
             try:
                 price_primary = prices.find("div", attrs={"class": "x-price-primary"}).text.strip()
-                price_primary = self.data_processor.extract_price(price_primary)
+                # price_primary = self.data_processor.extract_price(price_primary)
             except AttributeError:
                 price_primary = ""
 
             try:
                 actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
-                actual_price = self.data_processor.extract_price(actual_price)
+                # actual_price = self.data_processor.extract_price(actual_price)
             except AttributeError:
                 actual_price = ""
 
         try:
             saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
-            saving = self.data_processor.extract_price(saving)
+            # saving = self.data_processor.extract_price(saving)
         except AttributeError:
             saving = ""
 
@@ -191,6 +179,13 @@ class EbayParser:
         # product categories
         product_category = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'}).find_all('li')
         categories = ", ".join([category.find('a').text.strip() for category in product_category])
+
+        # posttage and shipping
+        shipping = soup.find('div', attrs={'data-testid': 'ux-layout-section-module'}).find_all('div', attrs={'class': 'ux-labels-values'})
+        for ship in shipping:
+            shipping_label = ship.find('div', attrs={'class': 'ux-labels-values__labels-content'}).text.strip()
+            shipping_value = ship.find('div', attrs={'class': 'ux-labels-values__values-content'}).text.strip()
+            product_details[shipping_label] = shipping_value
         
         product_data: dict[str, Any] = {
             "body_html": body_html,

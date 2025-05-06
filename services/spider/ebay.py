@@ -1,8 +1,12 @@
 from typing import Any
 from bs4 import BeautifulSoup
+
+
 from services.spider.parser import EbayParser
 from services.spider.response import SpiderResponse
 from core.config import config as cfg
+
+from dto.requests.product_request_sdc import ProductRequestSDC as ProductRequest
 
 
 class EbaySpider(object):
@@ -33,18 +37,17 @@ class EbaySpider(object):
 
         for product in products:
             # process here
-            product_url = product['product_url']
+            product_url = product["product_url"]
             product_details = self.get_product_details(product_url)
-            product_data: dict[str, Any] = {
+            product_data: ProductRequest = ProductRequest(
+                handle=product.get("handle"),
+                title=product.get("title"),
+                body_html=product_details.body_html,
+                vendor=product_details.vendor
+            )
+            product_lists.append(product_data)
 
-            }
-            
-            
-            
-
-        
-
-        return products
+        return product_lists
 
     def get_product_details(self, url: str):
         # response = self.response.get_response(url=url, mode="selenium")
@@ -55,7 +58,6 @@ class EbaySpider(object):
 
     def generate_products(self, query: str, category: str = None):
         products = self.get_products(query=query)
-
 
         # Format produk sesuai kebutuhan API
         formatted_products = []

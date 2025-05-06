@@ -70,3 +70,25 @@ class ProductRequestSDC:
     compare_at_price_international: Optional[float] = field(default=None, metadata={"alias": "Compare At Price / International"})
 
     status: Optional[str] = field(default=None, metadata={"alias": "Status"})
+
+
+
+@dataclass
+class ProductDetailsRequestSDC:
+    body_html: Optional[str] = None
+    image_src: Optional[str] = None
+    image_alt_text: Optional[str] = None
+    vendor: Optional[str] = None
+    product_category: Optional[str] = None
+    variant_sku: Optional[str] = None
+    prices: Optional[dict[str, str]] = field(default_factory=dict)
+    Condition: Optional[str] = None
+    Brand: Optional[str] = None
+    Bait_Type: Optional[str] = None
+    Bait_Shape: Optional[str] = None
+    Buoyancy: Optional[str] = None
+    Number_in_Pack: Optional[str] = None
+    Material: Optional[str] = None
+    Item_Weight: Optional[str] = None
+    Colour: Optional[str] = None
+    # Tambahkan atribut lain sesuai kebutuhan
