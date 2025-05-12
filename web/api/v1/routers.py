@@ -9,6 +9,7 @@ from manager.product_manager import EbayProductManager
 from manager.product_translate import ProductTranslateManager
 from manager.currency_manager import CurrencyManager
 from services.processors.file_processor import FileProcessor
+from fastapi.encoders import jsonable_encoder
 
 
 router = APIRouter(prefix="/api")
@@ -102,5 +103,6 @@ async def process_file(file: UploadFile = File(...)):
 @router.get("/detail")
 def test_detail():
     data = product_manager.test_product_detail()
+    data = jsonable_encoder(data)
     
     return JSONResponse(content=data, status_code=200)

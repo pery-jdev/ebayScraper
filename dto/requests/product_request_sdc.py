@@ -28,7 +28,7 @@ class ProductRequestSDC:
     variant_inventory_qty: Optional[int] = field(default=None, metadata={"alias": "Variant Inventory Qty"})
     variant_inventory_policy: Optional[str] = field(default=None, metadata={"alias": "Variant Inventory Policy"})
     variant_fulfillment_service: Optional[str] = field(default=None, metadata={"alias": "Variant Fulfillment Service"})
-    variant_price: Optional[float] = field(default=None, metadata={"alias": "Variant Price"})
+    variant_price: Optional[list[str]] = field(default=None, metadata={"alias": "Variant Price"})
     variant_compare_at_price: Optional[float] = field(default=None, metadata={"alias": "Variant Compare At Price"})
     variant_requires_shipping: Optional[bool] = field(default=None, metadata={"alias": "Variant Requires Shipping"})
     variant_taxable: Optional[bool] = field(default=None, metadata={"alias": "Variant Taxable"})
@@ -74,6 +74,12 @@ class ProductRequestSDC:
 
 
 @dataclass
+class Prices:
+    price_primary: Optional[str] = None
+    actual_price: Optional[str] = None
+    saving: Optional[str] = None
+
+@dataclass
 class ProductDetailsRequestSDC:
     body_html: Optional[str] = None
     image_src: Optional[str] = None
@@ -81,14 +87,14 @@ class ProductDetailsRequestSDC:
     vendor: Optional[str] = None
     product_category: Optional[str] = None
     variant_sku: Optional[str] = None
-    prices: Optional[dict[str, str]] = field(default_factory=dict)
-    Condition: Optional[str] = None
-    Brand: Optional[str] = None
-    Bait_Type: Optional[str] = None
-    Bait_Shape: Optional[str] = None
-    Buoyancy: Optional[str] = None
-    Number_in_Pack: Optional[str] = None
-    Material: Optional[str] = None
-    Item_Weight: Optional[str] = None
-    Colour: Optional[str] = None
-    # Tambahkan atribut lain sesuai kebutuhan
+    prices: Optional[Prices] = field(default_factory=Prices)
+    Condition: Optional[str] = None # Note: Field names starting with uppercase are generally not standard Python style
+    Brand: Optional[str] = None     # but kept here to match the input
+    Bait_Type: Optional[str] = field(metadata={'json_name': 'Bait Type'}, default=None) # Handling space in name
+    Model: Optional[str] = None
+    Item_Length: Optional[str] = field(metadata={'json_name': 'Item Length'}, default=None) # Handling space in name
+    Postage: Optional[str] = field(metadata={'json_name': 'Postage:'}, default=None) # Handling colon in name
+    # For the empty key "" which contains international delivery info
+    international_delivery_info: Optional[str] = field(metadata={'json_name': ''}, default=None)
+    Delivery: Optional[str] = field(metadata={'json_name': 'Delivery:'}, default=None) # Handling colon in name
+

@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from decimal import Decimal, DecimalException
 
 from dto.responses.currency_response import CurrencyResponse
-from dto.requests.product_request_sdc import ProductRequestSDC as ProductRequest
+from dto.requests.product_request_sdc import Prices, ProductRequestSDC as ProductRequest
 from dto.requests.product_request_sdc import ProductDetailsRequestSDC as ProductDetailRequest
 from services.spider.utils.xe_formatter import XeFormatter
 
@@ -66,137 +66,324 @@ class EbayParser:
 
         return products
 
-    def parse_product_details(self, soup: BeautifulSoup) -> ProductRequest:
+    # def parse_product_details(self, soup: BeautifulSoup):
+    #     """Parse detailed product information from product page
+
+    #     Args:
+    #         soup: BeautifulSoup instance of eBay product detail page
+
+    #     Returns:
+    #         Complete ProductRequest object with:
+    #         - variant_price: List of price options
+    #         - image_src: List of all image URLs
+    #         - vendor: Extracted brand information
+    #         - type: Product category
+
+    #     Raises:
+    #         AttributeError: If required elements are missing
+    #     """
+    #     product_details: dict[str, str] = {}
+
+
+    #     body = soup.find("div", attrs={"class": "tabs__content"})
+    #     body_html = str(body) if body else None
+
+    #     # prices
+    #     prices_list = []
+    #     prices = soup.find("div", attrs={"data-testid": "x-bin-price"})
+    #     price_primary = None
+    #     if prices:
+    #         try:
+    #             price_primary = prices.find("div", attrs={"class": "x-price-primary"}).text.strip()
+    #             # price_primary = self.data_processor.extract_price(price_primary)
+    #         except AttributeError:
+    #             price_primary = ""
+
+    #         try:
+    #             actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
+    #             # actual_price = self.data_processor.extract_price(actual_price)
+    #         except AttributeError:
+    #             actual_price = ""
+
+    #     try:
+    #         saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
+    #         # saving = self.data_processor.extract_price(saving)
+    #     except AttributeError:
+    #         saving = ""
+
+    #     product_details['prices'] = {
+    #         'price_primary': price_primary,
+    #         'actual_price': actual_price,
+    #         'saving': saving
+    #     }
+
+
+
+    #     # images
+    #     product_image_lists: list[str] = []
+    #     try:
+    #         images = soup.find("div", attrs={"data-testid": "x-photos"}).find_all(
+    #             "button", attrs={"class": "ux-image-grid-item"}
+    #         )
+    #         for image in images:
+    #             try:
+    #                 image_url = image.find("img")["src"]
+    #             except:
+    #                 image_url = image.find("img")["data-src"]
+    #             try:
+    #                 image_alt = image.find("img")["alt"]
+    #             except:
+    #                 image_alt = ""
+
+    #             image_data: dict[str, Any] = {
+    #                "url": image_url,
+    #                "alt": image_alt
+    #            }
+    #             product_image_lists.append(image_data)
+    #     except:
+    #         images = []
+
+    #     # variant
+    #     try:
+    #         variant_sku = soup.find(
+    #             "div",
+    #             attrs=[
+    #                 "class",
+    #                 "ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
+    #             ],
+    #         ).find("span", attrs={"class": "ux-textspans ux-textspans--BOLD"}).text.strip()
+    #     except:
+    #         pass
+
+        
+    #     try:
+    #         items = soup.find(
+    #             "div", attrs={"class": "ux-layout-section-evo ux-layout-section--features"}
+    #         ).find_all("div", attrs={"class": "ux-layout-section-evo__row"})
+    #         for item in items:
+    #             item_cols = item.find_all(
+    #                 "div", attrs={"class": "ux-layout-section-evo__col"}
+    #             )
+    #             for item_col in item_cols:
+    #                 item_col_label = item_col.find(
+    #                     "dt", attrs={"class": "ux-labels-values__labels"}
+    #                 )
+    #                 item_col_value = item_col.find(
+    #                     "dd", attrs={"class": "ux-labels-values__values"}
+    #                 )
+    #                 if item_col_label and item_col_value:
+    #                     product_details[item_col_label.text.strip()] = item_col_value.text.strip()
+    #     except:
+    #         items = []
+
+    #     # product categories
+    #     product_category = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'}).find_all('li')
+    #     categories = ", ".join([category.find('a').text.strip() for category in product_category])
+
+    #     # posttage and shipping
+    #     shipping = soup.find('div', attrs={'data-testid': 'ux-layout-section-module'}).find_all('div', attrs={'class': 'ux-labels-values'})
+    #     for ship in shipping:
+    #         shipping_label = ship.find('div', attrs={'class': 'ux-labels-values__labels-content'}).text.strip()
+    #         shipping_value = ship.find('div', attrs={'class': 'ux-labels-values__values-content'}).text.strip()
+    #         product_details[shipping_label] = shipping_value
+        
+    #     product_data: dict[str, Any] = {
+    #         "body_html": body_html,
+    #         "image_src": product_image_lists[0]['url'],
+    #         "image_alt_text": product_image_lists[0]['alt'],
+    #         "vendor": product_details.get("Brand", ""),
+    #         "product_category": categories,
+    #         "variant_sku": variant_sku,
+    #         **product_details
+    #     }
+    #     return product_data
+
+    def parse_product_details(self, soup: BeautifulSoup) -> ProductDetailRequest: # Mengubah tipe return
         """Parse detailed product information from product page
 
         Args:
             soup: BeautifulSoup instance of eBay product detail page
 
         Returns:
-            Complete ProductRequest object with:
-            - variant_price: List of price options
-            - image_src: List of all image URLs
-            - vendor: Extracted brand information
-            - type: Product category
+            ProductDetailsDTO object with parsed product information.
+            (Docstring diperbarui untuk mencerminkan return DTO)
 
         Raises:
-            AttributeError: If required elements are missing
+            AttributeError: If required elements are missing (bergantung pada implementasi error handling)
+            IndexError: If product_image_lists kosong
         """
-        product_details: dict[str, str] = {}
+        product_details: dict[str, Any] = {} # Mengubah tipe value menjadi Any karena prices adalah dict
 
 
         body = soup.find("div", attrs={"class": "tabs__content"})
         body_html = str(body) if body else None
 
         # prices
-        prices_list = []
-        prices = soup.find("div", attrs={"data-testid": "x-bin-price"})
-        price_primary = None
-        if prices:
+        # Variabel price_primary, actual_price, saving tetap ada
+        price_primary_val = None # Menggunakan _val untuk menghindari konflik jika ada field DTO dengan nama sama
+        actual_price_val = ""
+        saving_val = ""
+
+        prices_element = soup.find("div", attrs={"data-testid": "x-bin-price"}) # Mengganti nama variabel prices
+        if prices_element:
             try:
-                price_primary = prices.find("div", attrs={"class": "x-price-primary"}).text.strip()
-                # price_primary = self.data_processor.extract_price(price_primary)
+                price_primary_val = prices_element.find("div", attrs={"class": "x-price-primary"}).text.strip()
+                # price_primary_val = self.data_processor.extract_price(price_primary_val)
             except AttributeError:
-                price_primary = ""
+                price_primary_val = "" # Sesuai logika awal, default ke string kosong
 
             try:
-                actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
-                # actual_price = self.data_processor.extract_price(actual_price)
+                actual_price_val = prices_element.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
+                # actual_price_val = self.data_processor.extract_price(actual_price_val)
             except AttributeError:
-                actual_price = ""
+                actual_price_val = ""
+        
+        # Bagian saving dipisah karena struktur try-except awal
+        # Jika prices_element adalah None, prices_element.find akan error, jadi ini perlu penyesuaian
+        if prices_element: # Hanya coba cari saving jika prices_element ada
+            try:
+                saving_val = prices_element.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
+                # saving_val = self.data_processor.extract_price(saving_val)
+            except AttributeError:
+                saving_val = ""
+        else: # Jika prices_element tidak ada, saving juga tidak ada
+            saving_val = ""
 
-        try:
-            saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
-            # saving = self.data_processor.extract_price(saving)
-        except AttributeError:
-            saving = ""
 
-        product_details['prices'] = {
-            'price_primary': price_primary,
-            'actual_price': actual_price,
-            'saving': saving
-        }
-
-
+        # product_details['prices'] tidak lagi digunakan untuk menyimpan dict prices secara langsung
+        # karena akan dimasukkan ke DTO Prices.
+        # Namun, kita akan membuat instance DTO Prices di akhir.
 
         # images
-        product_image_lists: list[str] = []
-        try:
-            images = soup.find("div", attrs={"data-testid": "x-photos"}).find_all(
-                "button", attrs={"class": "ux-image-grid-item"}
-            )
-            for image in images:
-                try:
-                    image_url = image.find("img")["src"]
-                except:
-                    image_url = image.find("img")["data-src"]
-                try:
-                    image_alt = image.find("img")["alt"]
-                except:
-                    image_alt = ""
+        product_image_lists: list[dict[str, str]] = [] # Tipe diperjelas
+        image_src_val = None
+        image_alt_text_val = ""
 
-                image_data: dict[str, Any] = {
-                   "url": image_url,
-                   "alt": image_alt
-               }
-                product_image_lists.append(image_data)
-        except:
-            images = []
+        try:
+            images_container = soup.find("div", attrs={"data-testid": "x-photos"})
+            if images_container:
+                images = images_container.find_all(
+                    "button", attrs={"class": "ux-image-grid-item"}
+                )
+                for image in images:
+                    image_url = ""
+                    image_alt = ""
+                    img_tag = image.find("img")
+                    if img_tag:
+                        image_url = img_tag.get("src") or img_tag.get("data-src", "")
+                        image_alt = img_tag.get("alt", "")
+
+                    image_data: dict[str, str] = {
+                       "url": image_url,
+                       "alt": image_alt
+                    }
+                    product_image_lists.append(image_data)
+        except Exception: # Tangkap exception yang lebih umum jika ada masalah saat parsing gambar
+            images = [] # Variabel images ini tidak digunakan di luar blok ini, jadi tidak apa-apa
+
+        if product_image_lists:
+            image_src_val = product_image_lists[0].get('url')
+            image_alt_text_val = product_image_lists[0].get('alt', "")
+
 
         # variant
+        variant_sku_val = None # Menggunakan _val
         try:
-            variant_sku = soup.find(
+            sku_element = soup.find(
                 "div",
-                attrs=[
-                    "class",
-                    "ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
-                ],
-            ).find("span", attrs={"class": "ux-textspans ux-textspans--BOLD"}).text.strip()
-        except:
-            pass
+                class_="ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
+            ) # Atribut class bisa disederhanakan
+            if sku_element:
+                bold_span = sku_element.find("span", class_="ux-textspans ux-textspans--BOLD")
+                if bold_span:
+                    variant_sku_val = bold_span.text.strip()
+        except Exception:
+            pass # Sesuai logika awal
 
         
+        # Item specifics akan dimasukkan ke dalam dictionary product_details
         try:
-            items = soup.find(
+            items_section = soup.find(
                 "div", attrs={"class": "ux-layout-section-evo ux-layout-section--features"}
-            ).find_all("div", attrs={"class": "ux-layout-section-evo__row"})
-            for item in items:
-                item_cols = item.find_all(
-                    "div", attrs={"class": "ux-layout-section-evo__col"}
-                )
-                for item_col in item_cols:
-                    item_col_label = item_col.find(
-                        "dt", attrs={"class": "ux-labels-values__labels"}
+            )
+            if items_section:
+                items = items_section.find_all("div", attrs={"class": "ux-layout-section-evo__row"})
+                for item in items:
+                    item_cols = item.find_all(
+                        "div", attrs={"class": "ux-layout-section-evo__col"}
                     )
-                    item_col_value = item_col.find(
-                        "dd", attrs={"class": "ux-labels-values__values"}
-                    )
-                    if item_col_label and item_col_value:
-                        product_details[item_col_label.text.strip()] = item_col_value.text.strip()
-        except:
-            items = []
+                    for item_col in item_cols:
+                        item_col_label_tag = item_col.find(
+                            "dt", attrs={"class": "ux-labels-values__labels"}
+                        )
+                        item_col_value_tag = item_col.find(
+                            "dd", attrs={"class": "ux-labels-values__values"}
+                        )
+                        if item_col_label_tag and item_col_value_tag:
+                            label_text = item_col_label_tag.text.strip()
+                            value_text = item_col_value_tag.text.strip()
+                            # Membersihkan teks "... Read moreabout the condition" dari value Condition
+                            if label_text == "Condition" and "Read more" in value_text:
+                                value_text = value_text.split("Read more")[0].strip()
+                            product_details[label_text] = value_text
+        except Exception:
+            items = [] # Variabel items ini tidak digunakan di luar blok ini
 
         # product categories
-        product_category = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'}).find_all('li')
-        categories = ", ".join([category.find('a').text.strip() for category in product_category])
+        categories_val = "" # Menggunakan _val
+        try:
+            product_category_nav = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'})
+            if product_category_nav:
+                category_tags = product_category_nav.find_all('li')
+                categories_list = [category.find('a').text.strip() for category in category_tags if category.find('a')]
+                categories_val = ", ".join(categories_list)
+        except Exception:
+            pass # Menjaga agar tetap berjalan jika ada error
 
-        # posttage and shipping
-        shipping = soup.find('div', attrs={'data-testid': 'ux-layout-section-module'}).find_all('div', attrs={'class': 'ux-labels-values'})
-        for ship in shipping:
-            shipping_label = ship.find('div', attrs={'class': 'ux-labels-values__labels-content'}).text.strip()
-            shipping_value = ship.find('div', attrs={'class': 'ux-labels-values__values-content'}).text.strip()
-            product_details[shipping_label] = shipping_value
+        # postage and shipping
+        # Ini juga akan memasukkan data ke dalam dictionary product_details
+        try:
+            shipping_section = soup.find('div', attrs={'data-testid': 'ux-layout-section-module'}) # Mungkin perlu lebih spesifik
+            if shipping_section: # Pastikan shipping_section ditemukan
+                shipping_items = shipping_section.find_all('div', attrs={'class': 'ux-labels-values'})
+                for ship_item in shipping_items: # Mengganti nama variabel ship
+                    shipping_label_tag = ship_item.find('div', attrs={'class': 'ux-labels-values__labels-content'})
+                    shipping_value_tag = ship_item.find('div', attrs={'class': 'ux-labels-values__values-content'})
+                    if shipping_label_tag and shipping_value_tag:
+                        label_text = shipping_label_tag.text.strip()
+                        value_text = shipping_value_tag.text.strip()
+                        product_details[label_text] = value_text
+        except Exception:
+            pass
         
-        product_data: dict[str, Any] = {
-            "body_html": body_html,
-            "image_src": product_image_lists[0]['url'],
-            "image_alt_text": product_image_lists[0]['alt'],
-            "vendor": product_details.get("Brand", ""),
-            "product_category": categories,
-            "variant_sku": variant_sku,
-            **product_details
-        }
-        return product_data
+        # --- Membuat instance DTO Prices ---
+        prices_dto = Prices(
+            price_primary=price_primary_val,
+            actual_price=actual_price_val,
+            saving=saving_val
+        )
+
+        # --- Membuat instance DTO ProductDetailsDTO ---
+        # Menggunakan .get() untuk keamanan jika kunci tidak ada di product_details
+        product_data_dto = ProductDetailRequest(
+            body_html=body_html,
+            image_src=image_src_val,
+            image_alt_text=image_alt_text_val,
+            vendor=product_details.get("Brand"), # vendor diambil dari Brand
+            product_category=categories_val,
+            variant_sku=variant_sku_val,
+            prices=prices_dto,
+            Condition=product_details.get("Condition"),
+            Brand=product_details.get("Brand"),
+            Bait_Type=product_details.get("Bait Type"), # Mapping dari nama dengan spasi
+            Model=product_details.get("Model"),
+            Item_Length=product_details.get("Item Length"), # Mapping dari nama dengan spasi
+            Postage=product_details.get("Postage:"), # Mapping dari nama dengan :
+            international_delivery_info=product_details.get(""), # Mapping dari kunci kosong
+            Delivery=product_details.get("Delivery:") # Mapping dari nama dengan :
+        )
+        
+        return product_data_dto
 
         
 
