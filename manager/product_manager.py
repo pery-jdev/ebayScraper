@@ -17,7 +17,7 @@ class EbayProductManager:
             products = self.ebay_spider.generate_products(
                 query=query, category=category
             )
-            products_list = self.format_products(products)
+            products_list = products
             return products_list 
 
 

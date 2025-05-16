@@ -75,6 +75,7 @@ class EbaySpider(object):
 
     def generate_products(self, query: str, category: str = None):
         products = self.get_products(query=query)
+        print(products)
         return products
 
         # Format produk sesuai kebutuhan API

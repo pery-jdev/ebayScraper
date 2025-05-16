@@ -66,137 +66,6 @@ class EbayParser:
 
         return products
 
-    # def parse_product_details(self, soup: BeautifulSoup):
-    #     """Parse detailed product information from product page
-
-    #     Args:
-    #         soup: BeautifulSoup instance of eBay product detail page
-
-    #     Returns:
-    #         Complete ProductRequest object with:
-    #         - variant_price: List of price options
-    #         - image_src: List of all image URLs
-    #         - vendor: Extracted brand information
-    #         - type: Product category
-
-    #     Raises:
-    #         AttributeError: If required elements are missing
-    #     """
-    #     product_details: dict[str, str] = {}
-
-
-    #     body = soup.find("div", attrs={"class": "tabs__content"})
-    #     body_html = str(body) if body else None
-
-    #     # prices
-    #     prices_list = []
-    #     prices = soup.find("div", attrs={"data-testid": "x-bin-price"})
-    #     price_primary = None
-    #     if prices:
-    #         try:
-    #             price_primary = prices.find("div", attrs={"class": "x-price-primary"}).text.strip()
-    #             # price_primary = self.data_processor.extract_price(price_primary)
-    #         except AttributeError:
-    #             price_primary = ""
-
-    #         try:
-    #             actual_price = prices.find('div', attrs={'class':'x-additional-info__item--0'}).text.strip()
-    #             # actual_price = self.data_processor.extract_price(actual_price)
-    #         except AttributeError:
-    #             actual_price = ""
-
-    #     try:
-    #         saving = prices.find('div', attrs={'class':'x-additional-info__item--1'}).text.strip()
-    #         # saving = self.data_processor.extract_price(saving)
-    #     except AttributeError:
-    #         saving = ""
-
-    #     product_details['prices'] = {
-    #         'price_primary': price_primary,
-    #         'actual_price': actual_price,
-    #         'saving': saving
-    #     }
-
-
-
-    #     # images
-    #     product_image_lists: list[str] = []
-    #     try:
-    #         images = soup.find("div", attrs={"data-testid": "x-photos"}).find_all(
-    #             "button", attrs={"class": "ux-image-grid-item"}
-    #         )
-    #         for image in images:
-    #             try:
-    #                 image_url = image.find("img")["src"]
-    #             except:
-    #                 image_url = image.find("img")["data-src"]
-    #             try:
-    #                 image_alt = image.find("img")["alt"]
-    #             except:
-    #                 image_alt = ""
-
-    #             image_data: dict[str, Any] = {
-    #                "url": image_url,
-    #                "alt": image_alt
-    #            }
-    #             product_image_lists.append(image_data)
-    #     except:
-    #         images = []
-
-    #     # variant
-    #     try:
-    #         variant_sku = soup.find(
-    #             "div",
-    #             attrs=[
-    #                 "class",
-    #                 "ux-layout-section__textual-display ux-layout-section__textual-display--itemId",
-    #             ],
-    #         ).find("span", attrs={"class": "ux-textspans ux-textspans--BOLD"}).text.strip()
-    #     except:
-    #         pass
-
-        
-    #     try:
-    #         items = soup.find(
-    #             "div", attrs={"class": "ux-layout-section-evo ux-layout-section--features"}
-    #         ).find_all("div", attrs={"class": "ux-layout-section-evo__row"})
-    #         for item in items:
-    #             item_cols = item.find_all(
-    #                 "div", attrs={"class": "ux-layout-section-evo__col"}
-    #             )
-    #             for item_col in item_cols:
-    #                 item_col_label = item_col.find(
-    #                     "dt", attrs={"class": "ux-labels-values__labels"}
-    #                 )
-    #                 item_col_value = item_col.find(
-    #                     "dd", attrs={"class": "ux-labels-values__values"}
-    #                 )
-    #                 if item_col_label and item_col_value:
-    #                     product_details[item_col_label.text.strip()] = item_col_value.text.strip()
-    #     except:
-    #         items = []
-
-    #     # product categories
-    #     product_category = soup.find('nav', attrs={'class': 'breadcrumbs breadcrumb--overflow'}).find_all('li')
-    #     categories = ", ".join([category.find('a').text.strip() for category in product_category])
-
-    #     # posttage and shipping
-    #     shipping = soup.find('div', attrs={'data-testid': 'ux-layout-section-module'}).find_all('div', attrs={'class': 'ux-labels-values'})
-    #     for ship in shipping:
-    #         shipping_label = ship.find('div', attrs={'class': 'ux-labels-values__labels-content'}).text.strip()
-    #         shipping_value = ship.find('div', attrs={'class': 'ux-labels-values__values-content'}).text.strip()
-    #         product_details[shipping_label] = shipping_value
-        
-    #     product_data: dict[str, Any] = {
-    #         "body_html": body_html,
-    #         "image_src": product_image_lists[0]['url'],
-    #         "image_alt_text": product_image_lists[0]['alt'],
-    #         "vendor": product_details.get("Brand", ""),
-    #         "product_category": categories,
-    #         "variant_sku": variant_sku,
-    #         **product_details
-    #     }
-    #     return product_data
 
     def parse_product_details(self, soup: BeautifulSoup) -> ProductDetailRequest: # Mengubah tipe return
         """Parse detailed product information from product page
@@ -386,6 +255,17 @@ class EbayParser:
         return product_data_dto
 
         
+    def parse_categories(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        category_list: list[dict[str, Any]] = []
+        categories = soup.find('div', attrs={'class': 'gh-search__wrap'}).find('select').find_all('option')
+        for category in categories:
+            data_category: dict[str, Any] = {
+                "category_id": category['value'],
+                "category_value": category.text.strip(),
+            }
+            category_list.append(data_category)
+
+        return category_list
 
         
 
