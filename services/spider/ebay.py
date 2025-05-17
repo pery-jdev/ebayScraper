@@ -32,11 +32,11 @@ class EbaySpider(object):
             mode="selenium",
         )
 
-        products = self.parser.parse_products(soup=response)
+        products = self.parser.parse_products(soup=response) # <- product list nya
 
         for product in products:
             product_url = product['product_url']
-            product_details = self.get_product_details(product_url)
+            product_details = self.get_product_details(product_url) # <- product detail
 
             # Extract price and remove non-numeric characters
             price_string = product_details.prices.price_primary if product_details.prices else None

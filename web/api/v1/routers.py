@@ -106,3 +106,52 @@ def test_detail():
     data = jsonable_encoder(data)
     
     return JSONResponse(content=data, status_code=200)
+
+@router.post("/pipeline")
+async def run_pipeline(
+    file: UploadFile = File(...),
+    lures_per_bundle: int = Form(...),
+    min_usd_value: float = Form(...),
+    target_yen_per_lure: float = Form(...)
+):
+    try:
+        # 1. Read the CSV file
+        contents = await file.read()
+        # Assuming the input file is in a format pandas can read
+        df = pd.read_csv(contents)
+
+        # 2. Translate Product Names
+        # The translate_product method likely takes a DataFrame and returns a translated DataFrame
+        df = translate_manager.translate_product(df)
+
+        # 3. Search for Product Prices (USD & AUD)
+        # Call the new method in product_manager to add pricing
+        df = product_manager.add_pricing_to_dataframe(df)
+
+        # 4. Perform Currency Conversion (if needed for bundling rules)
+        # This step is now handled within add_pricing_to_dataframe where AUD is converted to USD.
+        # Ensure that the 'Cost in Yen' column exists and is appropriately named for bundle creation.
+        # If necessary, ensure data types for price_usd, price_aud, and cost in yen are numeric.
+
+        # 5. Create Bundles Based on Specific Rules and Identify Leftovers
+        # This step uses the logic from the /bundle endpoint
+        # Ensure product_manager.generate_bundles uses the 'price_usd', 'price_aud', and 'Cost in Yen' columns
+        bundles = product_manager.generate_bundles(
+            df, # Pass the DataFrame with translated names and prices
+            lures_per_bundle,
+            min_usd_value,
+            target_yen_per_lure
+        )
+
+        # 6. Return Results
+        # The bundles object should contain both the bundles and leftover information
+        return JSONResponse(content=bundles, status_code=200)
+
+    except Exception as e:
+        logging.error(f"Pipeline failed: {str(e)}")
+        return JSONResponse(
+            content={"error": f"Pipeline processing failed: {str(e)}"},
+            status_code=500
+        )
+
+# buatkan endpoint untuk process tahap 1

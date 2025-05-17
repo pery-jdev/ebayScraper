@@ -60,3 +60,60 @@ class EbayProductManager:
         except Exception as e:
             self.logger.error(f"Failed to generate bundles: {str(e)}")
             return []
+
+    def add_pricing_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Adds USD and AUD pricing to the DataFrame by searching on eBay.
+        """
+        self.logger.info("Adding pricing information to DataFrame...")
+        # Create new columns for pricing if they don't exist
+        if 'price_usd' not in df.columns:
+            df['price_usd'] = None
+        if 'price_aud' not in df.columns:
+            df['price_aud'] = None
+
+        # Iterate through the DataFrame and search for each product
+        for index, row in df.iterrows():
+            translated_name = row.get('Translated Name', row.get('Product Name')) # Assuming translated name is in 'Translated Name' column or fallback to 'Product Name'
+            if translated_name:
+                try:
+                    # Call the spider's get_products method
+                    # Note: This method returns a list, we might need logic to select the best match
+                    ebay_products = self.ebay_spider.get_products(query=translated_name)
+
+                    if ebay_products:
+                        # Assuming the first result is the most relevant or you need logic to select
+                        best_match = ebay_products[0]
+
+                        # Extract prices
+                        # The price is stored in variant_price after get_products processes it
+                        price_usd = None # Placeholder, need to check how get_products handles USD vs AUD
+                        price_aud = best_match.variant_price # Assuming variant_price is AUD based on ebay.com.au base_url
+
+                        # Convert AUD to USD if necessary
+                        if price_aud is not None:
+                            try:
+                                # Need to use currency_converter to convert AUD to USD
+                                # Assuming currency_converter.calculate_price_map returns a dict like {'USD': amount_in_usd}
+                                converted_prices = self.currency_converter.calculate_price_map(amount=price_aud, from_currency='AUD')
+                                price_usd = converted_prices.get('USD')
+                            except Exception as convert_e:
+                                self.logger.error(f"Currency conversion failed for {translated_name}: {convert_e}")
+                                price_usd = None # Set to None if conversion fails
+
+                        # Update DataFrame
+                        df.loc[index, 'price_aud'] = price_aud
+                        df.loc[index, 'price_usd'] = price_usd
+                        self.logger.info(f"Pricing added for {translated_name}: AUD={price_aud}, USD={price_usd}")
+
+                    else:
+                        self.logger.warning(f"No products found on eBay for query: {translated_name}")
+
+                except Exception as e:
+                    self.logger.error(f"Error searching eBay for {translated_name}: {e}")
+
+            else:
+                 self.logger.warning(f"No translated name available for row {index}, skipping pricing search.")
+
+        self.logger.info("Finished adding pricing information.")
+        return df
