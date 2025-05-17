@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import io
 
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import JSONResponse
@@ -38,7 +39,7 @@ async def search_products(query: str = Form(...), category: str = Form(None)):
 async def translate_products(file: UploadFile = File(...)):
     try:
         contents = await file.read()
-        df = pd.read_csv(contents)
+        df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         translated = translate_manager.translate_product(df)
         return JSONResponse(content=translated.to_dict('records'), status_code=200)
     except Exception as e:
@@ -116,9 +117,7 @@ async def run_pipeline(
 ):
     try:
         # 1. Read the CSV file
-        contents = await file.read()
-        # Assuming the input file is in a format pandas can read
-        df = pd.read_csv(contents)
+        df = pd.read_csv(file.file)
 
         # 2. Translate Product Names
         # The translate_product method likely takes a DataFrame and returns a translated DataFrame
