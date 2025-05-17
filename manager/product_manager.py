@@ -4,6 +4,7 @@ import logging
 from services.spider.ebay import EbaySpider
 from services.bundles.bundle_engine import BundleEngine
 from services.pricing.currency_converter import CurrencyConverter
+from dto.requests.product_request import ProductRequest
 
 
 class EbayProductManager:
@@ -46,7 +47,9 @@ class EbayProductManager:
         self, products_df, lures_per_bundle, min_usd_value, target_yen_per_lure
     ):
         try:
-            bundle_engine = BundleEngine(products_df.to_dict("records"))
+            # Konversi DataFrame ke list of ProductRequest agar BundleEngine tidak error
+            products = [ProductRequest(**row) for row in products_df.to_dict("records")]
+            bundle_engine = BundleEngine(products)
             bundles, leftovers = bundle_engine.generate_bundles(
                 lures_per_bundle=lures_per_bundle,
                 min_usd_value=min_usd_value,
