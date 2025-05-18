@@ -53,17 +53,30 @@ class EbayProductManager:
             products_df = self.preprocess_products_df(products_df)
             # Konversi DataFrame ke list of ProductRequest agar BundleEngine tidak error
             products = [ProductRequest(**row) for row in products_df.to_dict("records")]
+
+            # Tambahkan price_map ke setiap produk
+            for product, row in zip(products, products_df.to_dict("records")):
+                # Pastikan ada kolom harga yang dibutuhkan
+                price_map = {}
+                if "price_usd" in row and row["price_usd"] is not None:
+                    price_map["USD"] = float(row["price_usd"])
+                if "price_aud" in row and row["price_aud"] is not None:
+                    price_map["AUD"] = float(row["price_aud"])
+                product.price_map = price_map
+
+                # Jika ada cost, tambahkan juga
+                if hasattr(product, "cost_per_item") and product.cost_per_item is not None:
+                    product.cost = float(product.cost_per_item)
+                else:
+                    product.cost = 0.0  # Default jika tidak ada
+
             bundle_engine = BundleEngine(products)
             bundles, leftovers = bundle_engine.generate_bundles(
                 lures_per_bundle=lures_per_bundle,
                 min_usd_value=min_usd_value,
                 target_yen_per_lure=target_yen_per_lure,
             )
-
-            # Gabungkan bundles dan leftovers
-            all_items = bundles + leftovers
-            return all_items
-
+            return bundles, leftovers
         except Exception as e:
             self.logger.error(f"Failed to generate bundles: {str(e)}")
             return []
@@ -213,6 +226,7 @@ class EbayProductManager:
 
         return products_df
 
+    @staticmethod
     def clean_bool_column(series):
         # Nilai yang dianggap True
         true_values = {True, 'True', 'true', 1, '1', 'yes', 'Yes', 'y', 'Y'}
