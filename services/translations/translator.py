@@ -19,7 +19,7 @@ class MultiTranslator(object):
                 self.logger.info("Successfully translated using GoogleTranslate")
                 return result
             else:
-                _ = ts.preaccelerate_and_speedtest()  # Optional. Caching sessions in advance, which can help improve access speed.
+                # _ = ts.preaccelerate_and_speedtest()  # Optional. Caching sessions in advance, which can help improve access speed.
                 result = ts.translate_text(text, to_language=to_lang, from_language=from_lang, translator='google')
                 self.logger.info("Successfully translated using translators")
                 return result

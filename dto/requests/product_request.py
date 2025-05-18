@@ -1,6 +1,7 @@
-
 from pydantic import BaseModel, Field
 from typing import List, Optional
+import numpy as np
+import pandas as pd
 
 class ProductRequest(BaseModel):
     handle: Optional[str] = Field(None, alias="Product Handle")

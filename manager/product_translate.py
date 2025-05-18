@@ -14,6 +14,7 @@ class ProductTranslateManager:
         self.translator: MultiTranslator = MultiTranslator(translator='translators')
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
+        self.translation_cache = {}
 
     def translate_product(self, products: pd.DataFrame, columns: Optional[List[str]] = None):
         try:
@@ -47,11 +48,12 @@ class ProductTranslateManager:
                         # Convert to string untuk translasi
                         text_to_translate = str(original_value)
                         
-                        # Proses translasi
-                        translated = self.translator.translate_text(text=text_to_translate)
-                        
-                        # Kembalikan ke tipe data asli
-            
+                        # Cek cache dulu
+                        if text_to_translate in self.translation_cache:
+                            translated = self.translation_cache[text_to_translate]
+                        else:
+                            translated = self.translator.translate_text(text=text_to_translate)
+                            self.translation_cache[text_to_translate] = translated  # Simpan ke cache
                         
                         translated_products.at[index, col] = translated
                         

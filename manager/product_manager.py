@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import numpy as np
 
 from services.spider.ebay import EbaySpider
 from services.bundles.bundle_engine import BundleEngine
@@ -43,10 +44,13 @@ class EbayProductManager:
 
         return detail
 
+
     def generate_bundles(
         self, products_df, lures_per_bundle, min_usd_value, target_yen_per_lure
     ):
         try:
+            # PREPROCESSING DATAFRAME
+            products_df = self.preprocess_products_df(products_df)
             # Konversi DataFrame ke list of ProductRequest agar BundleEngine tidak error
             products = [ProductRequest(**row) for row in products_df.to_dict("records")]
             bundle_engine = BundleEngine(products)
@@ -63,7 +67,6 @@ class EbayProductManager:
         except Exception as e:
             self.logger.error(f"Failed to generate bundles: {str(e)}")
             return []
-
     def add_pricing_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Adds USD and AUD pricing to the DataFrame by searching on eBay.
@@ -120,3 +123,103 @@ class EbayProductManager:
 
         self.logger.info("Finished adding pricing information.")
         return df
+
+    def preprocess_products_df(self, products_df: pd.DataFrame) -> pd.DataFrame:
+        # Kolom string
+        string_columns = [
+            "Product Handle", "Product Title", "Body (HTML)", "Vendor or Brand Name", "Product Category",
+            "Product Type", "Product Tags",
+            "Option1 Name", "Option1 Value", "Option1 Linked To",
+            "Option2 Name", "Option2 Value", "Option2 Linked To",
+            "Option3 Name", "Option3 Value", "Option3 Linked To",
+            "Variant SKU", "Variant Inventory Tracker", "Variant Inventory Policy",
+            "Variant Fulfillment Service", "Variant Barcode", "Image Src", "Image Alt Text",
+            "SEO Title", "SEO Description", "Google Shopping / Google Product Category",
+            "Google Shopping / Gender", "Google Shopping / Age Group", "Google Shopping / MPN",
+            "Google Shopping / Condition", "Google Shopping / Custom Label 0", "Google Shopping / Custom Label 1",
+            "Google Shopping / Custom Label 2", "Google Shopping / Custom Label 3", "Google Shopping / Custom Label 4",
+            "Variant Tax Code", "Variant Weight Unit", "status"
+        ]
+        for col in string_columns:
+            if col in products_df.columns:
+                products_df[col] = products_df[col].replace(np.nan, "", regex=True).astype(str)
+
+        # Kolom boolean
+        bool_columns = [
+            "Product Status Draft or Published", "Variant Requires Shipping", "Variant Taxable", "Gift Card",
+            "Google Shopping / Custom Product", "Included / Japan", "Included / International"
+        ]
+        for col in bool_columns:
+            if col in products_df.columns:
+                products_df[col] = self.clean_bool_column(products_df[col])
+
+        # Kolom list
+        list_columns = ["Variant Price", "Variant Image"]
+        for col in list_columns:
+            if col in products_df.columns:
+                def to_list(x):
+                    if pd.isna(x):
+                        return []
+                    if isinstance(x, list):
+                        return x
+                    if hasattr(x, "result"):
+                        return [str(x.result)]
+                    return [str(x)]
+                products_df[col] = products_df[col].apply(to_list)
+
+        # Pastikan hasil translate berupa string di semua kolom string
+        for col in string_columns:
+            if col in products_df.columns:
+                products_df[col] = products_df[col].apply(lambda x: x.result if hasattr(x, "result") else x)
+                products_df[col] = products_df[col].replace(np.nan, "", regex=True).astype(str)
+
+        # Field wajib: status
+        if "status" not in products_df.columns:
+            products_df["status"] = "active"
+
+        # Kolom numerik (float)
+        float_columns = ["Variant Grams", "Cost per item"]
+        for col in float_columns:
+            if col in products_df.columns:
+                def to_float(x):
+                    if hasattr(x, "result"):
+                        try:
+                            return float(x.result)
+                        except Exception:
+                            return None
+                    try:
+                        return float(x)
+                    except Exception:
+                        return None
+                products_df[col] = products_df[col].apply(to_float)
+
+        # Kolom numerik (int)
+        int_columns = ["Image Position"]
+        for col in int_columns:
+            if col in products_df.columns:
+                def to_int(x):
+                    if pd.isna(x):
+                        return 0  # Default number
+                    if hasattr(x, "result"):
+                        try:
+                            return int(float(x.result))
+                        except Exception:
+                            return 0
+                    try:
+                        return int(float(x))
+                    except Exception:
+                        return 0
+                products_df[col] = products_df[col].apply(to_int)
+
+        return products_df
+
+    def clean_bool_column(series):
+        # Nilai yang dianggap True
+        true_values = {True, 'True', 'true', 1, '1', 'yes', 'Yes', 'y', 'Y'}
+        # Nilai yang dianggap False
+        false_values = {False, 'False', 'false', 0, '0', 'no', 'No', 'n', 'N', '', None, np.nan, float('nan')}
+        def to_bool(x):
+            if x in true_values:
+                return True
+            return False
+        return series.apply(to_bool)
