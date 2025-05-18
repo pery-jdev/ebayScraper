@@ -69,8 +69,14 @@ class ProductRequest(BaseModel):
     price_international: Optional[float] = Field(None, alias="Price / International")
     compare_at_price_international: Optional[float] = Field(None, alias="Compare At Price / International")
    
+    price_map: Optional[dict] = None  # Added to support bundle engine
+    cost: Optional[float] = None     # Added to support bundle engine
 
     status: Optional[str]
+
+    id: Optional[str] = None  # Unique identifier for bundle engine compatibility
+
+    bundle_group: Optional[str] = None  # Group assignment for bundle engine
 
 class Config:
     extra = 'ignore' 

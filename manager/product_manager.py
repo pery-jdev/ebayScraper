@@ -55,13 +55,11 @@ class EbayProductManager:
             products = [ProductRequest(**row) for row in products_df.to_dict("records")]
 
             # Tambahkan price_map ke setiap produk
-            for product, row in zip(products, products_df.to_dict("records")):
+            for idx, (product, row) in enumerate(zip(products, products_df.to_dict("records"))):
                 # Pastikan ada kolom harga yang dibutuhkan
                 price_map = {}
-                if "price_usd" in row and row["price_usd"] is not None:
-                    price_map["USD"] = float(row["price_usd"])
-                if "price_aud" in row and row["price_aud"] is not None:
-                    price_map["AUD"] = float(row["price_aud"])
+                price_map["USD"] = float(row["price_usd"]) if "price_usd" in row and row["price_usd"] is not None else 0.0
+                price_map["AUD"] = float(row["price_aud"]) if "price_aud" in row and row["price_aud"] is not None else 0.0
                 product.price_map = price_map
 
                 # Jika ada cost, tambahkan juga
@@ -69,6 +67,14 @@ class EbayProductManager:
                     product.cost = float(product.cost_per_item)
                 else:
                     product.cost = 0.0  # Default jika tidak ada
+
+                # Tambahkan id unik untuk bundle engine
+                if hasattr(product, 'handle') and product.handle:
+                    product.id = str(product.handle)
+                elif hasattr(product, 'variant_sku') and product.variant_sku:
+                    product.id = str(product.variant_sku)
+                else:
+                    product.id = f"product_{idx}"
 
             bundle_engine = BundleEngine(products)
             bundles, leftovers = bundle_engine.generate_bundles(
