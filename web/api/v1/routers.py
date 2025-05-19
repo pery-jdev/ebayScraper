@@ -1,6 +1,7 @@
 import pandas as pd
 import logging
 import io
+import math
 
 from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import JSONResponse
@@ -120,31 +121,41 @@ async def run_pipeline(
         df = pd.read_csv(file.file)
 
         # 2. Translate Product Names
-        # The translate_product method likely takes a DataFrame and returns a translated DataFrame
         df = translate_manager.translate_product(df)
 
         # 3. Search for Product Prices (USD & AUD)
-        # Call the new method in product_manager to add pricing
         df = product_manager.add_pricing_to_dataframe(df)
 
-        # 4. Perform Currency Conversion (if needed for bundling rules)
-        # This step is now handled within add_pricing_to_dataframe where AUD is converted to USD.
-        # Ensure that the 'Cost in Yen' column exists and is appropriately named for bundle creation.
-        # If necessary, ensure data types for price_usd, price_aud, and cost in yen are numeric.
-
-        # 5. Create Bundles Based on Specific Rules and Identify Leftovers
-        # This step uses the logic from the /bundle endpoint
-        # Ensure product_manager.generate_bundles uses the 'price_usd', 'price_aud', and 'Cost in Yen' columns
-        bundles = product_manager.generate_bundles(
-            df, # Pass the DataFrame with translated names and prices
+        # 4. Create Bundles Based on Specific Rules and Identify Leftovers
+        bundles, leftovers = product_manager.generate_bundles(
+            df,
             lures_per_bundle,
             min_usd_value,
             target_yen_per_lure
         )
 
-        # 6. Return Results
-        # The bundles object should contain both the bundles and leftover information
-        return JSONResponse(content=bundles, status_code=200)
+        # Clean and prepare the response
+        cleaned_bundles = clean_floats(bundles)
+        cleaned_leftovers = clean_floats(leftovers)
+        
+        response_data = {
+            "bundles": cleaned_bundles,
+            "leftovers": cleaned_leftovers
+        }
+
+        # Save as json and csv with pandas for response_data
+        # Save bundles and leftovers as JSON
+        bundles_df = pd.DataFrame(cleaned_bundles)
+        leftovers_df = pd.DataFrame(cleaned_leftovers)
+
+        bundles_df.to_json("bundles.json", orient="records", force_ascii=False)
+        leftovers_df.to_json("leftovers.json", orient="records", force_ascii=False)
+
+        # Save bundles and leftovers as CSV
+        bundles_df.to_csv("bundles.csv", index=False)
+        leftovers_df.to_csv("leftovers.csv", index=False)
+        
+        return JSONResponse(content=jsonable_encoder(response_data), status_code=200)
 
     except Exception as e:
         logging.error(f"Pipeline failed: {str(e)}")
@@ -153,4 +164,18 @@ async def run_pipeline(
             status_code=500
         )
 
-# buatkan endpoint untuk process tahap 1
+def clean_floats(obj):
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    elif isinstance(obj, dict):
+        return {k: clean_floats(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_floats(i) for i in obj]
+    elif hasattr(obj, 'dict'):  # Handle Pydantic models
+        return clean_floats(obj.dict())
+    elif hasattr(obj, '__dict__'):  # Handle other objects with __dict__
+        return clean_floats(obj.__dict__)
+    else:
+        return obj
