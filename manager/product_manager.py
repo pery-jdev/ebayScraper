@@ -99,7 +99,9 @@ class EbayProductManager:
 
         # Iterate through the DataFrame and search for each product
         for index, row in df.iterrows():
-            translated_name = row.get('Translated Name', row.get('Product Name')) # Assuming translated name is in 'Translated Name' column or fallback to 'Product Name'
+            # Debug columnn name
+            self.logger.info(f"row index: {index}, columns: {df.columns.tolist()}")
+            translated_name = row.get('Handle', row.get('Title')) # Assuming translated name is in 'Translated Name' column or fallback to 'Product Name'
             if translated_name:
                 try:
                     # Call the spider's get_products method

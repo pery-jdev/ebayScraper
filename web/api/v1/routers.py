@@ -150,6 +150,10 @@ async def run_pipeline(
             logging.error("Translation failed - no data returned")
             raise ValueError("Translation failed - no data returned")
 
+        # log file
+        with open("logfile_translated.txt", "a") as f:
+            f.write(f"Columns after translation: {df_translated.columns}\n")
+
         # 3. Search for Product Prices (USD & AUD)
         df = product_manager.add_pricing_to_dataframe(df_translated)
 
