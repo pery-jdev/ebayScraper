@@ -4,7 +4,7 @@ import numpy as np
 
 from services.spider.ebay import EbaySpider
 from services.bundles.bundle_engine import BundleEngine
-from services.pricing.currency_converter import CurrencyConverter
+from manager.currency_manager import CurrencyManager
 from dto.requests.product_request import ProductRequest
 
 
@@ -12,7 +12,7 @@ class EbayProductManager:
     def __init__(self):
         self.ebay_spider = EbaySpider()
         self.logger = logging.getLogger(__name__)
-        self.currency_converter = CurrencyConverter()
+        self.currency_manager = CurrencyManager()
 
     def get_products(self, query: str, category: str = None):
         try:
@@ -120,13 +120,15 @@ class EbayProductManager:
                         # Convert AUD to USD if necessary
                         if price_aud is not None:
                             try:
-                                # Need to use currency_converter to convert AUD to USD
-                                # Assuming currency_converter.calculate_price_map returns a dict like {'USD': amount_in_usd}
-                                converted_prices = self.currency_converter.calculate_price_map(amount=price_aud, from_currency='AUD')
+                                # Use currency_manager to convert AUD to USD
+                                converted_prices = self.currency_manager.calculate_price_map(
+                                    base_currency='AUD',
+                                    base_amount=price_aud
+                                )
                                 price_usd = converted_prices.get('USD')
                             except Exception as convert_e:
                                 self.logger.error(f"Currency conversion failed for {translated_name}: {convert_e}")
-                                price_usd = None # Set to None if conversion fails
+                                price_usd = None  # Set to None if conversion fails
 
                         # Update DataFrame
                         df.loc[index, 'price_aud'] = price_aud
