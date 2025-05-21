@@ -173,3 +173,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 temp/
+
+bundles.csv
+bundles.json
+leftovers.csv
+leftovers.json
+translated_product_names.csv
+logfile.txt
+logfile_translated.txt
