@@ -1,0 +1,297 @@
+{
+  "info": {
+    "_postman_id": "YOUR_POSTMAN_COLLECTION_ID",
+    "name": "EbayScraper API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "API endpoints for the EbayScraper project, which automates product translation, price searching (including eBay), and bundle creation for fishing lures."
+  },
+  "item": [
+    {
+      "name": "Root Endpoint",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api"
+          ]
+        },
+        "description": "A simple endpoint to check if the API is running."
+      },
+      "response": []
+    },
+    {
+      "name": "Search Products",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "query",
+              "value": "fishing lure",
+              "description": "The search query for the product."
+            },
+            {
+              "key": "category",
+              "value": "lures",
+              "description": "Optional category to narrow down the search.",
+              "optional": true
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/search",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "search"
+          ]
+        },
+        "description": "Searches for products based on a query and an optional category. This endpoint likely interacts with eBay to fetch product information."
+      },
+      "response": []
+    },
+    {
+      "name": "Translate Products",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/your/input.csv",
+              "description": "A CSV file containing product names to translate."
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/translate",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "translate"
+          ]
+        },
+        "description": "Translates product names from a provided CSV file (Japanese to English)."
+      },
+      "response": []
+    },
+    {
+      "name": "Create Bundles",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/your/product_data.csv",
+              "description": "A CSV file containing product data."
+            },
+            {
+              "key": "lures_per_bundle",
+              "value": "6",
+              "description": "The exact number of lures per bundle (e.g., 6)."
+            },
+            {
+              "key": "min_usd_value",
+              "value": "75.0",
+              "description": "Minimum total overseas value in USD (e.g., 75.0)."
+            },
+            {
+              "key": "target_yen_per_lure",
+              "value": "850.0",
+              "description": "Average cost per lure in Yen (e.g., 850.0)."
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/bundle",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "bundle"
+          ]
+        },
+        "description": "Creates bundles of products based on specified rules from a provided CSV file."
+      },
+      "response": []
+    },
+    {
+      "name": "Convert Currency",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "amount",
+              "value": "100.0",
+              "description": "The amount to convert."
+            },
+            {
+              "key": "from_currency",
+              "value": "USD",
+              "description": "The currency to convert from (e.g., \"USD\")."
+            },
+            {
+              "key": "to_currency",
+              "value": "AUD",
+              "description": "The currency to convert to (e.g., \"AUD\")."
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/convert",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "convert"
+          ]
+        },
+        "description": "Converts a given amount from one currency to another."
+      },
+      "response": []
+    },
+    {
+      "name": "Process File (Generic CSV Read)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/your/any_file.csv",
+              "description": "The CSV file to process."
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/process",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "process"
+          ]
+        },
+        "description": "A generic endpoint to read and return the contents of a CSV file."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Product Detail (Test Endpoint)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8000/api/detail",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "detail"
+          ]
+        },
+        "description": "A test endpoint to retrieve product details."
+      },
+      "response": []
+    },
+    {
+      "name": "Run Full Pipeline",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/your/input_products.csv",
+              "description": "A CSV file containing product data (e.g., \"Product Name\" in Japanese)."
+            },
+            {
+              "key": "lures_per_bundle",
+              "value": "6",
+              "description": "The exact number of lures per bundle (e.g., 6)."
+            },
+            {
+              "key": "min_usd_value",
+              "value": "75.0",
+              "description": "Minimum total overseas value in USD (e.g., 75.0)."
+            },
+            {
+              "key": "target_yen_per_lure",
+              "value": "850.0",
+              "description": "Average cost per lure in Yen (e.g., 850.0)."
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/pipeline",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "pipeline"
+          ]
+        },
+        "description": "This endpoint executes the entire workflow: 1. Reads the input CSV file. 2. Translates product names (Japanese to English). 3. Searches for product prices (USD & AUD) from various sources, including eBay. 4. Creates bundles based on specified rules and identifies leftover lures."
+      },
+      "response": []
+    }
+  ]
+}
