@@ -73,7 +73,6 @@ class TaskTracker:
                     "status": task.status,
                     "created_at": task.created_at.isoformat(),
                     "updated_at": task.updated_at.isoformat(),
-                    "result": task.result,
                     "error": task.error,
                     "progress": task.progress
                 }
