@@ -1,4 +1,5 @@
 import re
+import pandas as pd
 
 from typing import Any
 from xml.etree.ElementTree import ParseError
@@ -51,7 +52,6 @@ class EbayParser:
             product_url = product.find("a", class_="s-item__link")
             product_url = product_url["href"] if product_url else ""
 
-
             vendor = "eBay"  # Default vendor
             data_dict: dict[str, Any] = {
                 "handle": product_url,
@@ -63,6 +63,10 @@ class EbayParser:
             }
 
             products.append(data_dict)
+
+        # pandas dataframe save to csv
+        df = pd.DataFrame(products)
+        df.to_csv("results/products.csv", index=False)
 
         return products
 

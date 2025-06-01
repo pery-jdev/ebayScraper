@@ -2,17 +2,22 @@ import pandas as pd
 import logging
 import io
 import math
+import asyncio
+from typing import AsyncGenerator
+from dataclasses import asdict
 
-from fastapi import APIRouter, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from dto.requests.product_request_sdc import (
+    ProductRequestSDC,
     ProductDetailsRequestSDC as ProductDetailRequest,
 )
 from manager.product_manager import EbayProductManager
 from manager.product_translate import ProductTranslateManager
 from manager.currency_manager import CurrencyManager
 from services.processors.file_processor import FileProcessor
+from services.task_tracker import task_tracker
 from fastapi.encoders import jsonable_encoder
 
 
@@ -28,14 +33,115 @@ async def root():
     return {"message": "Hello World"}
 
 
-@router.post("/search")
-async def search_products(query: str = Form(...), category: str = Form(None)):
+async def process_search_task(task_id: str, query: str, category: str = None):
+    """Background task to process search request."""
     try:
-        products = product_manager.get_products(query=query, category=category)
-        return JSONResponse(content=products, status_code=200)
+        products = product_manager.search_products(query=query, category=category)
+        
+        def process_products():
+            for product in products:
+                if 'product_details' in product and product['product_details']:
+                    product['product_details'] = asdict(product['product_details'])
+                yield product
+        
+        # Process products and update task incrementally
+        processed_count = 0
+        total_products = []
+        
+        for product in process_products():
+            total_products.append(product)
+            processed_count += 1
+            # Update task with current progress
+            task_tracker.update_task(
+                task_id, 
+                "processing", 
+                result=total_products,
+                progress={
+                    "processed": processed_count,
+                    "total": len(products) if products else 0
+                }
+            )
+            # Add a small delay to prevent blocking
+            await asyncio.sleep(0.1)
+        
+        # Mark task as completed when done
+        task_tracker.update_task(task_id, "completed", result=total_products)
     except Exception as e:
         logging.error(f"Search failed: {str(e)}")
-        return JSONResponse(content={"error": "Product search failed"}, status_code=500)
+        task_tracker.update_task(task_id, "failed", error=str(e))
+
+
+@router.post("/search")
+async def search_products(
+    background_tasks: BackgroundTasks,
+    query: str = Form(...),
+    category: str = Form(None)
+):
+    """Start a background search task and return task ID."""
+    task_id = task_tracker.create_task("search")
+    # Add task to background tasks
+    background_tasks.add_task(process_search_task, task_id, query, category)
+    return JSONResponse(
+        content={"task_id": task_id, "status": "pending"},
+        status_code=202
+    )
+
+
+async def stream_task_updates(task_id: str) -> AsyncGenerator[str, None]:
+    """Stream task updates as they become available."""
+    while True:
+        task = task_tracker.get_task(task_id)
+        if not task:
+            yield "data: Task not found\n\n"
+            break
+            
+        if task["status"] in ["completed", "failed"]:
+            yield f"data: {jsonable_encoder(task)}\n\n"
+            break
+            
+        yield f"data: {jsonable_encoder(task)}\n\n"
+        await asyncio.sleep(0.5)  # Poll every 500ms
+
+
+@router.get("/tasks/{task_id}/stream")
+async def stream_task_status(task_id: str):
+    """Stream task status updates using Server-Sent Events."""
+    return StreamingResponse(
+        stream_task_updates(task_id),
+        media_type="text/event-stream"
+    )
+
+
+@router.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    """Get the status of a specific task."""
+    task = task_tracker.get_task(task_id)
+    if not task:
+        return JSONResponse(
+            content={"error": "Task not found"},
+            status_code=404
+        )
+    
+    # If task is still processing, return current results
+    if task["status"] == "processing":
+        return JSONResponse(
+            content={
+                "status": task["status"],
+                "result": task["result"],
+                "progress": task.get("progress", {}),
+                "task_id": task_id
+            },
+            status_code=200
+        )
+    
+    return JSONResponse(content=task, status_code=200)
+
+
+@router.get("/tasks")
+async def list_tasks():
+    """List all tasks."""
+    tasks = task_tracker.list_tasks()
+    return JSONResponse(content=tasks, status_code=200)
 
 
 @router.post("/translate")

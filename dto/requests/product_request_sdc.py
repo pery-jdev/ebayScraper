@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import List, Optional
 
 @dataclass
@@ -28,7 +28,7 @@ class ProductRequestSDC:
     variant_inventory_qty: Optional[int] = field(default=None, metadata={"alias": "Variant Inventory Qty"})
     variant_inventory_policy: Optional[str] = field(default=None, metadata={"alias": "Variant Inventory Policy"})
     variant_fulfillment_service: Optional[str] = field(default=None, metadata={"alias": "Variant Fulfillment Service"})
-    variant_price: Optional[list[str]] = field(default=None, metadata={"alias": "Variant Price"})
+    variant_price: Optional[float] = field(default=None, metadata={"alias": "Variant Price"})
     variant_compare_at_price: Optional[float] = field(default=None, metadata={"alias": "Variant Compare At Price"})
     variant_requires_shipping: Optional[bool] = field(default=None, metadata={"alias": "Variant Requires Shipping"})
     variant_taxable: Optional[bool] = field(default=None, metadata={"alias": "Variant Taxable"})
@@ -71,7 +71,20 @@ class ProductRequestSDC:
 
     status: Optional[str] = field(default=None, metadata={"alias": "Status"})
 
+    def to_dict(self):
+        """Convert the dataclass instance to a dictionary."""
+        return asdict(self)
 
+    @classmethod
+    def to_dict_generator(cls, products):
+        """Generator that yields dictionaries from a list of ProductRequestSDC objects or dictionaries."""
+        for product in products:
+            if isinstance(product, cls):
+                yield product.to_dict()
+            elif isinstance(product, dict):
+                yield product
+            else:
+                raise ValueError(f"Unsupported product type: {type(product)}")
 
 @dataclass
 class Prices:
@@ -98,3 +111,13 @@ class ProductDetailsRequestSDC:
     international_delivery_info: Optional[str] = field(metadata={'json_name': ''}, default=None)
     Delivery: Optional[str] = field(metadata={'json_name': 'Delivery:'}, default=None) # Handling colon in name
 
+    @classmethod
+    def to_dict(cls, products):
+        """Generator that yields dictionaries from a list of ProductRequestSDC objects or dictionaries."""
+        for product in products:
+            if isinstance(product, cls):
+                yield product.to_dict()
+            elif isinstance(product, dict):
+                yield product
+            else:
+                raise ValueError(f"Unsupported product type: {type(product)}")

@@ -17,6 +17,24 @@ class EbaySpider(object):
         self.response: SpiderResponse = SpiderResponse()
         self.parser: EbayParser = EbayParser()
 
+    def search_products(self, query: str):
+        response = self.response.get_response(
+            url=f"{self.base_url[0]}sch/i.html?",
+            params={
+                "_nkw": query,
+                "_sacat": 0,
+                "_from": "R40",
+                "_trksid": "p2334524.m570.l1313",
+                "_odkw": "laptop",
+                "_osacat": 0,
+            },
+            mode="httpx",
+        )
+
+        products = self.parser.parse_products(soup=response) # <- product list nya
+
+        return products
+
     def get_products(self, query: str):
         product_lists: list[ProductRequest] = []
         response = self.response.get_response(
@@ -29,7 +47,7 @@ class EbaySpider(object):
                 "_odkw": "laptop",
                 "_osacat": 0,
             },
-            mode="selenium",
+            mode="httpx",
         )
 
         products = self.parser.parse_products(soup=response) # <- product list nya
@@ -67,11 +85,18 @@ class EbaySpider(object):
         return product_lists
 
     def get_product_details(self, url: str):
-        response = self.response.get_response(url=url, mode="selenium")
+        response = self.response.get_response(url=url, mode="httpx")
         # f = open(cfg.TEMP_DIR / "response.html", "r")
         # soup = BeautifulSoup(f.read(), "html.parser")
         product = self.parser.parse_product_details(soup=response)
         return product
+
+    def search_products_with_details(self, query: str):
+        products = self.search_products(query=query)
+        for product in products:
+            product_details = self.get_product_details(product['product_url'])
+            product['product_details'] = product_details
+        return products
 
     def generate_products(self, query: str, category: str = None):
         products = self.get_products(query=query)

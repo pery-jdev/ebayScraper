@@ -1,6 +1,8 @@
 import logging
 import requests
+import httpx
 import os
+import time
 
 from typing import Any
 from bs4 import BeautifulSoup
@@ -33,7 +35,7 @@ class SpiderResponse(object):
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         },
         use_session: bool = False,
-        mode: str = "selenium",
+        mode: str = "httpx",
     ) -> BeautifulSoup:
         if mode not in self.modes:
             raise ValueError(f"Mode {mode} is not supported. Choise from: {self.modes}")
@@ -64,6 +66,39 @@ class SpiderResponse(object):
                         return BeautifulSoup(f.read(), "html.parser")
 
                 return BeautifulSoup(res.text, "html.parser")
+
+        elif mode == "httpx":
+            try:
+                print(f"Requesting url use httpx: {url}")
+                # Add 2 second delay before making request
+                time.sleep(2)
+                # Configure httpx client to follow redirects
+                with httpx.Client(follow_redirects=True) as client:
+                    res = client.get(url, params=params)
+                    print(f"Requesting url use httpx: {res.url}")
+            except Exception as e:
+                print(e)
+                raise
+
+            if res.status_code != 200:
+                # logging error with response
+                try:
+                    os.makedirs(cfg.TEMP_DIR, exist_ok=True)
+                except FileExistsError:
+                    pass
+
+                with open(cfg.TEMP_DIR / "error.html", "w") as f:
+                    f.write(res.text)
+                    f.close()
+                raise Exception(f"Request failed with status code: {res.status_code}")
+            else:
+                if cfg.DEBUG:
+                    with open(cfg.TEMP_DIR / "response.html", "w") as f:
+                        f.write(res.text)
+                        return BeautifulSoup(f.read(), "html.parser")
+
+                return BeautifulSoup(res.text, "html.parser")
+
         elif mode == "selenium":
             # formatted url here
             options = self.options.get_chrome_options()
