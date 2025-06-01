@@ -22,7 +22,6 @@ def get_db() -> Session:
     """Get database session with automatic cleanup."""
     db = SessionLocal()
 
-    print(db)
     try:
         yield db
     finally:
