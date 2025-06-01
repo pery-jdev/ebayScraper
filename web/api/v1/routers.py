@@ -5,6 +5,7 @@ import math
 import asyncio
 from typing import AsyncGenerator
 from dataclasses import asdict
+import json
 
 from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -19,6 +20,7 @@ from manager.currency_manager import CurrencyManager
 from services.processors.file_processor import FileProcessor
 from services.task_tracker import task_tracker
 from fastapi.encoders import jsonable_encoder
+import httpx
 
 
 router = APIRouter(prefix="/api")
@@ -36,21 +38,54 @@ async def root():
 async def process_search_task(task_id: str, query: str, category: str = None):
     """Background task to process search request."""
     try:
-        products = product_manager.search_products(query=query, category=category)
+        # Update task to processing state immediately
+        task_tracker.update_task(
+            task_id, 
+            "processing", 
+            progress={"processed": 0, "total": 0, "status": "fetching_products"}
+        )
         
-        def process_products():
-            for product in products:
-                if 'product_details' in product and product['product_details']:
-                    product['product_details'] = asdict(product['product_details'])
-                yield product
+        # Run product search in a separate thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        products = await loop.run_in_executor(
+            None, 
+            lambda: product_manager.search_products(query=query, category=category)
+        )
         
-        # Process products and update task incrementally
+        total_count = len(products) if products else 0
+        task_tracker.update_task(
+            task_id,
+            "processing",
+            progress={
+                "processed": 0,
+                "total": total_count,
+                "status": "processing_products"
+            }
+        )
+        
+        # Process products in smaller batches
+        batch_size = 10
         processed_count = 0
         total_products = []
         
-        for product in process_products():
-            total_products.append(product)
-            processed_count += 1
+        for i in range(0, total_count, batch_size):
+            batch = products[i:i + batch_size]
+            
+            # Process batch in a separate thread
+            processed_batch = await loop.run_in_executor(
+                None,
+                lambda b: [
+                    {**p, 'product_details': asdict(p['product_details'])} 
+                    if 'product_details' in p and p['product_details'] 
+                    else p 
+                    for p in b
+                ],
+                batch
+            )
+            
+            total_products.extend(processed_batch)
+            processed_count += len(batch)
+            
             # Update task with current progress
             task_tracker.update_task(
                 task_id, 
@@ -58,15 +93,32 @@ async def process_search_task(task_id: str, query: str, category: str = None):
                 result=total_products,
                 progress={
                     "processed": processed_count,
-                    "total": len(products) if products else 0
+                    "total": total_count,
+                    "status": "processing_products"
                 }
             )
-            await asyncio.sleep(0.1)
+            
+            # Allow other tasks to run
+            await asyncio.sleep(0.05)
         
-        task_tracker.update_task(task_id, "completed", result=total_products)
+        task_tracker.update_task(
+            task_id, 
+            "completed", 
+            result=total_products,
+            progress={
+                "processed": total_count,
+                "total": total_count,
+                "status": "completed"
+            }
+        )
     except Exception as e:
         logging.error(f"Search failed: {str(e)}")
-        task_tracker.update_task(task_id, "failed", error=str(e))
+        task_tracker.update_task(
+            task_id, 
+            "failed", 
+            error=str(e),
+            progress={"status": "failed"}
+        )
 
 
 async def process_translate_task(task_id: str, file_content: bytes):
@@ -356,3 +408,12 @@ def clean_floats(obj):
         return clean_floats(obj.__dict__)
     else:
         return obj
+
+
+async def check_task_status(task_id: str):
+    """Check the status of a task using a separate HTTP request."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f'/api/tasks/{task_id}')
+        data = response.json()
+        print(f"Status: {data['status']}")
+        print(f"Progress: {data['progress']}")
