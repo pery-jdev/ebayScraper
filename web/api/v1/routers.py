@@ -390,24 +390,36 @@ async def list_tasks():
     return JSONResponse(content=tasks, status_code=200)
 
 
-def clean_floats(obj):
+def clean_floats(obj, _processed=None):
     """Clean float values to be JSON compliant."""
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        if abs(obj) > 1e10 or (abs(obj) < 1e-10 and obj != 0):
-            return round(obj, 10)
-        return obj
-    elif isinstance(obj, dict):
-        return {k: clean_floats(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [clean_floats(i) for i in obj]
-    elif hasattr(obj, "dict"):
-        return clean_floats(obj.dict())
-    elif hasattr(obj, "__dict__"):
-        return clean_floats(obj.__dict__)
-    else:
-        return obj
+    if _processed is None:
+        _processed = set()
+    
+    # Handle circular references
+    if id(obj) in _processed:
+        return None
+    _processed.add(id(obj))
+    
+    try:
+        if isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            if abs(obj) > 1e10 or (abs(obj) < 1e-10 and obj != 0):
+                return round(obj, 10)
+            return obj
+        elif isinstance(obj, dict):
+            return {k: clean_floats(v, _processed) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [clean_floats(i, _processed) for i in obj]
+        elif hasattr(obj, "dict"):
+            return clean_floats(obj.dict(), _processed)
+        elif hasattr(obj, "__dict__"):
+            return clean_floats(obj.__dict__, _processed)
+        else:
+            return obj
+    except Exception as e:
+        logging.error(f"Error cleaning floats: {str(e)}")
+        return str(obj)  # Fallback to string representation
 
 
 async def check_task_status(task_id: str):
