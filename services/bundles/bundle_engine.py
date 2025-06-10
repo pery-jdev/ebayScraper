@@ -1,119 +1,100 @@
 from typing import List, Tuple
-
-from dto.requests.product_request import ProductRequest
+from services.bundles.models import Product, Bundle
+import uuid
 
 import csv
 
 
 class BundleEngine:
-    def __init__(self, products: List[ProductRequest]):
-        self.products = products
-        self.bundle_counter = 0
-
-    def _validate_bundle(
+    def __init__(
         self,
-        bundle: List[ProductRequest],
-        min_usd_value: float = 75,
-        target_yen_per_lure: float = 850,
-    ) -> bool:
-        """Validasi bundle dengan parameter yang bisa dikustomisasi"""
-        if not bundle:
-            return False
-
-        total_usd = sum(p.price_map["USD"] for p in bundle)
-        total_aud = sum(p.price_map["AUD"] for p in bundle)
-        avg_cost = sum(p.cost for p in bundle) / len(bundle)
-        profit_margin = sum((p.price_map["USD"] * 0.85 - p.cost / 100) for p in bundle)
-
-        # Range yen ±10% dari target
-        min_yen = target_yen_per_lure * 0.9
-        max_yen = target_yen_per_lure * 1.1
-
-        return (
-            total_usd >= min_usd_value
-            and min_yen <= avg_cost <= max_yen
-            and profit_margin >= 25  # Minimal $25 profit per bundle
-        )
-
-    def generate_bundles(
-        self,
+        products: List[Product],
         lures_per_bundle: int = 6,
         min_usd_value: float = 75,
         target_yen_per_lure: float = 850,
-    ) -> Tuple[List[List[ProductRequest]], List[ProductRequest]]:
-        """Generate bundle dengan parameter yang bisa dikustomisasi"""
-        if not self.products:
-            self.products = self.generate_dummy_products()
+    ):
+        self.products = products
+        self.lures_per_bundle = lures_per_bundle
+        self.min_usd_value = min_usd_value
+        self.target_yen_per_lure = target_yen_per_lure
+        self.bundle_counter = 0
 
-        # Sort produk berdasarkan profit margin (USD tertinggi)
+    def _validate_bundle(self, bundle: List[Product]) -> bool:
+        """Validate bundle with configurable parameters"""
+        if not bundle:
+            return False
+
+        total_usd = sum(p.price_usd for p in bundle)
+        total_aud = sum(p.price_aud for p in bundle)
+
+        return total_usd >= self.min_usd_value
+
+    def generate_bundles(self) -> List[Bundle]:
+        """Generate bundles with configurable parameters"""
+        if not self.products:
+            return []
+
+        # Sort products by USD price (highest first)
         sorted_products = sorted(
             self.products,
-            key=lambda p: (p.price_map["USD"] / p.cost, p.price_map["USD"]),
+            key=lambda p: p.price_usd,
             reverse=True,
         )
 
-        # Alokasi greedy dengan priority queue
+        # Greedy allocation
         bundles = []
         current_bundle = []
 
-        for ProductRequest in sorted_products:
-            temp_bundle = current_bundle + [ProductRequest]
+        for product in sorted_products:
+            temp_bundle = current_bundle + [product]
 
-            if len(temp_bundle) == lures_per_bundle:
-                if self._validate_bundle(
-                    temp_bundle, min_usd_value, target_yen_per_lure
-                ):
-                    bundles.append(temp_bundle)
+            if len(temp_bundle) == self.lures_per_bundle:
+                if self._validate_bundle(temp_bundle):
+                    bundle_id = f"BUNDLE-{uuid.uuid4().hex[:8]}"
+                    bundles.append(
+                        Bundle(
+                            id=bundle_id,
+                            products=temp_bundle,
+                            total_value_usd=sum(p.price_usd for p in temp_bundle),
+                            total_value_aud=sum(p.price_aud for p in temp_bundle),
+                        )
+                    )
                     current_bundle = []
                 else:
-                    current_bundle = temp_bundle[:-1]  # Simpan sementara
+                    current_bundle = temp_bundle[:-1]  # Save temporarily
             else:
-                current_bundle.append(ProductRequest)
+                current_bundle.append(product)
 
-            # Cek jika current_bundle sudah bisa jadi valid bundle
-            if len(current_bundle) >= (lures_per_bundle // 2) and self._validate_bundle(
-                current_bundle, min_usd_value, target_yen_per_lure
+            # Check if current_bundle can be a valid bundle
+            if len(current_bundle) >= (self.lures_per_bundle // 2) and self._validate_bundle(
+                current_bundle
             ):
-                # Isi sisa slot dengan produk termurah
-                while len(current_bundle) < lures_per_bundle:
+                # Fill remaining slots with cheapest products
+                while len(current_bundle) < self.lures_per_bundle:
                     cheapest = min(
                         (p for p in sorted_products if p not in current_bundle),
-                        key=lambda p: p.cost,
+                        key=lambda p: p.price_usd,
                         default=None,
                     )
                     if cheapest:
                         current_bundle.append(cheapest)
 
-                if self._validate_bundle(
-                    current_bundle, min_usd_value, target_yen_per_lure
-                ):
-                    bundles.append(current_bundle)
+                if self._validate_bundle(current_bundle):
+                    bundle_id = f"BUNDLE-{uuid.uuid4().hex[:8]}"
+                    bundles.append(
+                        Bundle(
+                            id=bundle_id,
+                            products=current_bundle,
+                            total_value_usd=sum(p.price_usd for p in current_bundle),
+                            total_value_aud=sum(p.price_aud for p in current_bundle),
+                        )
+                    )
                     current_bundle = []
 
-        # Final validation dan leftover handling
-        valid_bundles = [
-            b
-            for b in bundles
-            if self._validate_bundle(b, min_usd_value, target_yen_per_lure)
-        ]
-        used_ids = {p.id for bundle in valid_bundles for p in bundle}
-        leftovers = [p for p in self.products if p.id not in used_ids]
-
-        # Format output untuk API
-        formatted_bundles = []
-        for i, bundle in enumerate(valid_bundles, 1):
-            for product in bundle:
-                product.bundle_group = str(i)
-                formatted_bundles.append(product)
-
-        for leftover in leftovers:
-            leftover.bundle_group = "leftover"
-            formatted_bundles.append(leftover)
-
-        return formatted_bundles, []
+        return bundles
 
     def save_to_csv(
-        self, bundles: List[List[ProductRequest]], leftovers: List[ProductRequest]
+        self, bundles: List[List[Product]], leftovers: List[Product]
     ):
         """Simpan hasil bundle ke CSV"""
         with open(
@@ -138,8 +119,8 @@ class BundleEngine:
                     [
                         f"BUNDLE-{i:03}",
                         ",".join(p.id for p in bundle),
-                        sum(p.price_map["USD"] for p in bundle),
-                        sum(p.price_map["AUD"] for p in bundle),
+                        sum(p.price_usd for p in bundle),
+                        sum(p.price_aud for p in bundle),
                         sum(p.cost for p in bundle) / len(bundle),
                     ]
                 )

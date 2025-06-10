@@ -5,15 +5,9 @@ import math
 import asyncio
 from typing import AsyncGenerator
 from dataclasses import asdict
-import json
-
 from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from dto.requests.product_request_sdc import (
-    ProductRequestSDC,
-    ProductDetailsRequestSDC as ProductDetailRequest,
-)
 from manager.product_manager import EbayProductManager
 from manager.product_translate import ProductTranslateManager
 from manager.currency_manager import CurrencyManager
@@ -168,6 +162,44 @@ async def process_currency_task(
         task_tracker.update_task(task_id, "failed", error=str(e))
 
 
+@router.post("/pipeline")
+async def run_pipeline(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    lures_per_bundle: int = Form(5),
+    min_usd_value: float = Form(50.0),
+    target_yen_per_lure: float = Form(1000.0),
+):
+    """
+    Start a background pipeline task and return task ID.
+    The task will:
+    1. Clean data
+    2. Translate product names
+    3. Add pricing information
+    4. Generate bundles
+    """
+    task_id = task_tracker.create_task("pipeline")
+    task_tracker.update_task(task_id, "pending")
+    
+    # Read file content
+    file_content = await file.read()
+    
+    # Add the processing task to background tasks
+    background_tasks.add_task(
+        process_pipeline_task,
+        task_id,
+        file_content,
+        lures_per_bundle,
+        min_usd_value,
+        target_yen_per_lure
+    )
+    
+    return JSONResponse(
+        content={"task_id": task_id, "status": "pending"},
+        status_code=202
+    )
+
+
 async def process_pipeline_task(
     task_id: str,
     file_content: bytes,
@@ -177,7 +209,7 @@ async def process_pipeline_task(
 ):
     """Background task to process pipeline request."""
     try:
-        # 1. Read the CSV file
+        # Read the CSV file
         task_tracker.update_task(task_id, "processing", progress={"step": "reading_file"})
         df = pd.read_csv(io.BytesIO(file_content))
 
@@ -191,14 +223,16 @@ async def process_pipeline_task(
         df_translated = await translate_manager.translate_product(df_cleaned)
         del df_cleaned
 
-        if df_translated is not None:
-            df_translated.to_csv("translated_product_names.csv", index=False, sep=";")
-        else:
-            raise ValueError("Translation failed - no data returned")
+        if df_translated is None or df_translated.empty:
+            raise ValueError("Translation failed or produced empty DataFrame")
 
         # 3. Search for Product Prices
         task_tracker.update_task(task_id, "processing", progress={"step": "pricing"})
         df = await product_manager.add_pricing_to_dataframe(df_translated)
+        del df_translated
+
+        if df is None or df.empty:
+            raise ValueError("Pricing failed or produced empty DataFrame")
 
         # 4. Create Bundles
         task_tracker.update_task(task_id, "processing", progress={"step": "bundling"})
@@ -206,24 +240,57 @@ async def process_pipeline_task(
             df, lures_per_bundle, min_usd_value, target_yen_per_lure
         )
 
-        # Clean and prepare the response
-        cleaned_bundles = clean_floats(bundles)
-        cleaned_leftovers = clean_floats(leftovers)
-        cleaned_df = clean_floats(df.to_dict("records"))
+        if bundles is None:
+            raise ValueError("Bundle generation failed")
 
+        # Clean and prepare the response
+        task_tracker.update_task(task_id, "processing", progress={"step": "finalizing"})
+        
         response_data = {
-            "bundles": cleaned_bundles,
-            "leftovers": cleaned_leftovers,
-            "translated_product_names": cleaned_df,
+            "bundles": [
+                {
+                    "id": bundle.id,
+                    "products": [
+                        {
+                            "title": product.title,
+                            "price_usd": product.price_usd,
+                            "price_aud": product.price_aud,
+                        }
+                        for product in bundle.products
+                    ],
+                    "total_value_usd": bundle.total_value_usd,
+                    "total_value_aud": bundle.total_value_aud,
+                }
+                for bundle in bundles
+            ],
+            "leftovers": [
+                {
+                    "title": product.title,
+                    "price_usd": product.price_usd,
+                    "price_aud": product.price_aud,
+                }
+                for product in leftovers
+            ],
         }
 
-        # Save results
-        bundles_df = pd.DataFrame(cleaned_bundles)
-        leftovers_df = pd.DataFrame(cleaned_leftovers)
-        task_tracker.update_task(task_id, "completed", result=response_data)
+        # save to csv
+        task_tracker.update_task(task_id, "processing", progress={"step": "saving_to_csv"})
+        bundles_df = pd.DataFrame(bundles)
+        leftovers_df = pd.DataFrame(leftovers)
+        bundles_df.to_csv("bundles.csv", index=False)
+        leftovers_df.to_csv("leftovers.csv", index=False)
+
+        # save to json pandas
+        task_tracker.update_task(task_id, "processing", progress={"step": "saving_to_json"})
+        bundles_df.to_json("bundles.json", orient="records", lines=True)
+        leftovers_df.to_json("leftovers.json", orient="records", lines=True)
+
+        task_tracker.update_task(task_id, "completed", response_data)
+
     except Exception as e:
-        logging.error(f"Pipeline processing failed: {str(e)}")
-        task_tracker.update_task(task_id, "failed", error=str(e))
+        error_msg = f"Pipeline processing failed: {str(e)}"
+        logging.error(error_msg)
+        task_tracker.update_task(task_id, "failed", {"error": error_msg})
 
 
 @router.post("/search")
@@ -296,31 +363,6 @@ async def convert_currency(
         amount,
         from_currency,
         to_currency
-    )
-    return JSONResponse(
-        content={"task_id": task_id, "status": "pending"},
-        status_code=202
-    )
-
-
-@router.post("/pipeline")
-async def run_pipeline(
-    background_tasks: BackgroundTasks,
-    file: UploadFile = File(...),
-    lures_per_bundle: int = Form(...),
-    min_usd_value: float = Form(...),
-    target_yen_per_lure: float = Form(...),
-):
-    """Start a background pipeline task and return task ID."""
-    task_id = task_tracker.create_task("pipeline")
-    contents = await file.read()
-    background_tasks.add_task(
-        process_pipeline_task,
-        task_id,
-        contents,
-        lures_per_bundle,
-        min_usd_value,
-        target_yen_per_lure
     )
     return JSONResponse(
         content={"task_id": task_id, "status": "pending"},

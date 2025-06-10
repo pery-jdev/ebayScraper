@@ -2,9 +2,10 @@ import pandas as pd
 import logging
 import numpy as np
 import asyncio
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from services.spider.ebay import EbaySpider
 from services.bundles.bundle_engine import BundleEngine
+from services.bundles.models import Bundle, Product
 from manager.currency_manager import CurrencyManager
 from dto.requests.product_request import ProductRequest
 
@@ -14,6 +15,7 @@ class EbayProductManager:
         self.ebay_spider = EbaySpider()
         self.logger = logging.getLogger(__name__)
         self.currency_manager = CurrencyManager()
+        self._current_df = None
 
     def get_products(self, query: str, category: str = None):
         try:
@@ -52,59 +54,75 @@ class EbayProductManager:
         return detail
 
     def generate_bundles(
-        self, products_df, lures_per_bundle, min_usd_value, target_yen_per_lure
-    ):
+        self,
+        df: pd.DataFrame,
+        lures_per_bundle: int,
+        min_usd_value: float,
+        target_yen_per_lure: float,
+    ) -> Tuple[List[Bundle], List[Product]]:
+        """
+        Generate bundles from the DataFrame.
+        Returns a tuple of (bundles, leftovers).
+        """
         try:
-            # PREPROCESSING DATAFRAME
-            products_df = self.preprocess_products_df(products_df)
-            # Konversi DataFrame ke list of ProductRequest agar BundleEngine tidak error
-            products = [ProductRequest(**row) for row in products_df.to_dict("records")]
+            self.logger.info("Starting bundle generation...")
 
-            # Tambahkan price_map ke setiap produk
-            for idx, (product, row) in enumerate(
-                zip(products, products_df.to_dict("records"))
-            ):
-                # Pastikan ada kolom harga yang dibutuhkan
-                price_map = {}
-                price_map["USD"] = (
-                    float(row["price_usd"])
-                    if "price_usd" in row and row["price_usd"] is not None
-                    else 0.0
+            df.to_json("df_before_bundling.json", orient="records", force_ascii=False)
+            
+            # Convert cost per item to float
+            df['Cost per item'] = pd.to_numeric(df['Cost per item'], errors='coerce')
+            
+            # Calculate prices using approximate conversion rates
+            df['price_aud'] = df['Cost per item']
+            df['price_usd'] = df['Cost per item'] * 0.65  # Approximate AUD to USD
+            df['price_jpy'] = df['Cost per item'] * 100  # Approximate AUD to JPY
+
+            # Drop rows with NaN prices
+            df = df.dropna(subset=["price_usd", "price_aud", "price_jpy"])
+            
+            if df.empty:
+                self.logger.warning("No valid products with prices found for bundling")
+                return [], []
+
+            # Convert DataFrame to list of Product objects
+            products = []
+            for _, row in df.iterrows():
+                product = Product(
+                    title=row["Title"],
+                    price_usd=float(row["price_usd"]),
+                    price_aud=float(row["price_aud"]),
                 )
-                price_map["AUD"] = (
-                    float(row["price_aud"])
-                    if "price_aud" in row and row["price_aud"] is not None
-                    else 0.0
-                )
-                product.price_map = price_map
+                products.append(product)
 
-                # Jika ada cost, tambahkan juga
-                if (
-                    hasattr(product, "cost_per_item")
-                    and product.cost_per_item is not None
-                ):
-                    product.cost = float(product.cost_per_item)
-                else:
-                    product.cost = 0.0  # Default jika tidak ada
-
-                # Tambahkan id unik untuk bundle engine
-                if hasattr(product, "handle") and product.handle:
-                    product.id = str(product.handle)
-                elif hasattr(product, "variant_sku") and product.variant_sku:
-                    product.id = str(product.variant_sku)
-                else:
-                    product.id = f"product_{idx}"
-
-            bundle_engine = BundleEngine(products)
-            bundles, leftovers = bundle_engine.generate_bundles(
+            # Initialize bundle engine
+            bundle_engine = BundleEngine(
+                products=products,
                 lures_per_bundle=lures_per_bundle,
                 min_usd_value=min_usd_value,
                 target_yen_per_lure=target_yen_per_lure,
             )
+
+            # Generate bundles
+            bundles = bundle_engine.generate_bundles()
+            
+            if not bundles:
+                self.logger.warning("No bundles could be generated with the given parameters")
+                return [], products
+
+            # Get leftover products
+            used_products = set()
+            for bundle in bundles:
+                used_products.update(bundle.products)
+            leftovers = [p for p in products if p not in used_products]
+
+            self.logger.info(
+                f"Generated {len(bundles)} bundles with {len(leftovers)} leftover products"
+            )
             return bundles, leftovers
+
         except Exception as e:
             self.logger.error(f"Failed to generate bundles: {str(e)}")
-            return []
+            return [], []
 
     async def add_pricing_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -116,6 +134,9 @@ class EbayProductManager:
             df["price_usd"] = None
         if "price_aud" not in df.columns:
             df["price_aud"] = None
+
+        # Store the DataFrame reference
+        self._current_df = df
 
         # Process products in batches
         batch_size = 10
@@ -146,31 +167,31 @@ class EbayProductManager:
                 # Assuming the first result is the most relevant
                 best_match = ebay_products[0]
 
-                # Extract prices
+                # Extract prices and clean them
                 price_aud = best_match.variant_price
-
-                # Convert AUD to USD if necessary
-                if price_aud is not None:
+                if price_aud:
+                    # Remove currency symbol and convert to float
+                    price_aud = float(price_aud.replace("AU $", "").replace(",", "").strip())
+                    
                     try:
                         # Use currency_manager to convert AUD to USD
-                        converted_prices = self.currency_manager.calculate_price_map(
-                            base_currency="AUD", base_amount=price_aud
-                        )
-                        price_usd = converted_prices.get("USD")
+                        price_usd = price_aud * 0.65  # Approximate AUD to USD conversion
                     except Exception as convert_e:
                         self.logger.error(
                             f"Currency conversion failed for {translated_name}: {convert_e}"
                         )
                         price_usd = None
                 else:
+                    price_aud = None
                     price_usd = None
 
                 # Update DataFrame
-                df.loc[index, "price_aud"] = price_aud
-                df.loc[index, "price_usd"] = price_usd
-                self.logger.info(
-                    f"Pricing added for {translated_name}: AUD={price_aud}, USD={price_usd}"
-                )
+                if self._current_df is not None:
+                    self._current_df.loc[index, "price_aud"] = price_aud
+                    self._current_df.loc[index, "price_usd"] = price_usd
+                    self.logger.info(
+                        f"Pricing added for {translated_name}: AUD={price_aud}, USD={price_usd}"
+                    )
             else:
                 self.logger.warning(
                     f"No products found on eBay for query: {translated_name}"
