@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-
+import asyncio
 from typing import List, Optional
 from services.processors.file_processor import FileProcessor
 from services.processors.data_processor import DataProcessor
@@ -26,7 +26,7 @@ class ProductTranslateManager:
 
         self.translation_cache = {}
 
-    def translate_product(
+    async def translate_product(
         self, products: pd.DataFrame, columns: Optional[List[str]] = None
     ):
         try:
@@ -56,76 +56,39 @@ class ProductTranslateManager:
             with open("translation_details.log", "w", encoding="utf-8") as log_file:
                 log_file.write("=== Translation Details ===\n\n")
                 
-                # iterate using iterrows instead of range
-                for index, row in translated_products.iterrows():
-                    log_file.write(f"\n--- Row {index} ---\n")
+                # Process translations in batches
+                batch_size = 50
+                for col in valid_columns:
+                    # Get all non-null values for this column
+                    texts_to_translate = []
+                    indices = []
+                    for index, value in translated_products[col].items():
+                        if pd.notna(value) and isinstance(value, str) and value.strip():
+                            texts_to_translate.append(value.strip())
+                            indices.append(index)
                     
-                    for col in valid_columns:
-                        original_value = row[col]
+                    if not texts_to_translate:
+                        continue
 
-                        # Skip nilai kosong atau non-string
-                        if pd.isna(original_value) or not isinstance(original_value, str):
-                            continue
-
-                        try:
-                            # Convert to string untuk translasi
-                            text_to_translate = str(original_value).strip()
-                            
-                            # Skip empty strings
-                            if not text_to_translate:
-                                continue
-
-                            # Cek cache dulu
-                            if text_to_translate in self.translation_cache:
-                                translated = self.translation_cache[text_to_translate]
-                                self.logger.debug(
-                                    f"Using cached translation for: {text_to_translate}"
+                    # Translate in batches
+                    for i in range(0, len(texts_to_translate), batch_size):
+                        batch = texts_to_translate[i:i + batch_size]
+                        batch_indices = indices[i:i + batch_size]
+                        
+                        # Translate batch
+                        translated_batch = await self.translator.translate_batch(batch)
+                        
+                        # Update DataFrame with translations
+                        for batch_idx, (idx, translated) in enumerate(zip(batch_indices, translated_batch)):
+                            if translated:
+                                translated_products.at[idx, col] = translated
+                                # Log translation
+                                log_file.write(
+                                    f"Column: {col}\n"
+                                    f"Original: {batch[batch_idx]}\n"
+                                    f"Translated: {translated}\n"
+                                    f"{'='*50}\n"
                                 )
-                            else:
-                                self.logger.debug(f"Translating: {text_to_translate}")
-                                try:
-                                    translated = self.translator.translate_text(
-                                        text=text_to_translate
-                                    )
-                                    if translated:
-                                        self.translation_cache[text_to_translate] = translated
-                                        self.logger.debug(f"New translation: {translated}")
-                                    else:
-                                        self.logger.warning(
-                                            f"Empty translation result for: {text_to_translate}"
-                                        )
-                                        translated = original_value
-                                except Exception as trans_e:
-                                    self.logger.error(
-                                        f"Translation error for text '{text_to_translate}': {str(trans_e)}"
-                                    )
-                                    translated = original_value
-
-                            # Log translation details
-                            log_file.write(
-                                f"Column: {col}\n"
-                                f"Original: {text_to_translate}\n"
-                                f"Translated: {translated}\n"
-                                f"{'='*50}\n"
-                            )
-
-                            # Update the value in the DataFrame
-                            translated_products.at[index, col] = translated
-
-                        except Exception as e:
-                            self.logger.error(
-                                f"Translation failed for column '{col}' at index {index}: {str(e)}\n"
-                                f"Original text: '{text_to_translate}'"
-                            )
-                            translated_products.at[index, col] = original_value
-                            
-                            # Log error in translation details
-                            log_file.write(
-                                f"Column: {col}\n"
-                                f"Original: {text_to_translate}\n"
-                                f"Error: {str(e)}\n"
-                                f"{'='*50}\n"
-                            )
 
             self.logger.info(
                 f"Translation completed. Processed {len(translated_products)} products"

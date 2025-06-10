@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from web.api.v1.routers import router as EbayAPIRouter
-from web.app.routers import router as EbayAppRouter
 
 
 def create_app() -> FastAPI:
+    from web.api.v1.routers import router as EbayAPIRouter
+    from web.app.routers import router as EbayAppRouter
+    
     app: FastAPI = FastAPI()
 
     app.include_router(EbayAPIRouter)

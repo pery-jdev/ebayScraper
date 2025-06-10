@@ -1,7 +1,8 @@
 import pandas as pd
 import logging
 import numpy as np
-
+import asyncio
+from typing import List, Dict, Any
 from services.spider.ebay import EbaySpider
 from services.bundles.bundle_engine import BundleEngine
 from manager.currency_manager import CurrencyManager
@@ -105,9 +106,9 @@ class EbayProductManager:
             self.logger.error(f"Failed to generate bundles: {str(e)}")
             return []
 
-    def add_pricing_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+    async def add_pricing_to_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Adds USD and AUD pricing to the DataFrame by searching on eBay.
+        Adds USD and AUD pricing to the DataFrame by searching on eBay asynchronously.
         """
         self.logger.info("Adding pricing information to DataFrame...")
         # Create new columns for pricing if they don't exist
@@ -116,70 +117,69 @@ class EbayProductManager:
         if "price_aud" not in df.columns:
             df["price_aud"] = None
 
-        # Iterate through the DataFrame and search for each product
-        for index, row in df.iterrows():
-            # Debug columnn name
-            self.logger.info(f"row index: {index}, columns: {df.columns.tolist()}")
-            translated_name = row.get(
-                "Handle", row.get("Title")
-            )  # Assuming translated name is in 'Translated Name' column or fallback to 'Product Name'
-            if translated_name:
-                try:
-                    # Call the spider's get_products method
-                    # Note: This method returns a list, we might need logic to select the best match
-                    ebay_products = self.ebay_spider.get_products(query=translated_name)
-
-                    if ebay_products:
-                        # Assuming the first result is the most relevant or you need logic to select
-                        best_match = ebay_products[0]
-
-                        # Extract prices
-                        # The price is stored in variant_price after get_products processes it
-                        price_usd = None  # Placeholder, need to check how get_products handles USD vs AUD
-                        price_aud = (
-                            best_match.variant_price
-                        )  # Assuming variant_price is AUD based on ebay.com.au base_url
-
-                        # Convert AUD to USD if necessary
-                        if price_aud is not None:
-                            try:
-                                # Use currency_manager to convert AUD to USD
-                                converted_prices = (
-                                    self.currency_manager.calculate_price_map(
-                                        base_currency="AUD", base_amount=price_aud
-                                    )
-                                )
-                                price_usd = converted_prices.get("USD")
-                            except Exception as convert_e:
-                                self.logger.error(
-                                    f"Currency conversion failed for {translated_name}: {convert_e}"
-                                )
-                                price_usd = None  # Set to None if conversion fails
-
-                        # Update DataFrame
-                        df.loc[index, "price_aud"] = price_aud
-                        df.loc[index, "price_usd"] = price_usd
-                        self.logger.info(
-                            f"Pricing added for {translated_name}: AUD={price_aud}, USD={price_usd}"
-                        )
-
-                    else:
-                        self.logger.warning(
-                            f"No products found on eBay for query: {translated_name}"
-                        )
-
-                except Exception as e:
-                    self.logger.error(
-                        f"Error searching eBay for {translated_name}: {e}"
-                    )
-
-            else:
-                self.logger.warning(
-                    f"No translated name available for row {index}, skipping pricing search."
-                )
+        # Process products in batches
+        batch_size = 10
+        for i in range(0, len(df), batch_size):
+            batch_df = df.iloc[i:i + batch_size]
+            tasks = []
+            
+            # Create tasks for each product in the batch
+            for index, row in batch_df.iterrows():
+                translated_name = row.get("Handle", row.get("Title"))
+                if translated_name:
+                    tasks.append(self._process_product_pricing(index, translated_name))
+            
+            # Wait for all tasks in the batch to complete
+            if tasks:
+                await asyncio.gather(*tasks)
 
         self.logger.info("Finished adding pricing information.")
         return df
+
+    async def _process_product_pricing(self, index: int, translated_name: str) -> None:
+        """Process pricing for a single product asynchronously"""
+        try:
+            # Get products from eBay
+            ebay_products = await self.ebay_spider.get_products(query=translated_name)
+
+            if ebay_products:
+                # Assuming the first result is the most relevant
+                best_match = ebay_products[0]
+
+                # Extract prices
+                price_aud = best_match.variant_price
+
+                # Convert AUD to USD if necessary
+                if price_aud is not None:
+                    try:
+                        # Use currency_manager to convert AUD to USD
+                        converted_prices = self.currency_manager.calculate_price_map(
+                            base_currency="AUD", base_amount=price_aud
+                        )
+                        price_usd = converted_prices.get("USD")
+                    except Exception as convert_e:
+                        self.logger.error(
+                            f"Currency conversion failed for {translated_name}: {convert_e}"
+                        )
+                        price_usd = None
+                else:
+                    price_usd = None
+
+                # Update DataFrame
+                df.loc[index, "price_aud"] = price_aud
+                df.loc[index, "price_usd"] = price_usd
+                self.logger.info(
+                    f"Pricing added for {translated_name}: AUD={price_aud}, USD={price_usd}"
+                )
+            else:
+                self.logger.warning(
+                    f"No products found on eBay for query: {translated_name}"
+                )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error searching eBay for {translated_name}: {e}"
+            )
 
     def preprocess_products_df(self, products_df: pd.DataFrame) -> pd.DataFrame:
         # Kolom string

@@ -125,7 +125,7 @@ async def process_translate_task(task_id: str, file_content: bytes):
     """Background task to process translation request."""
     try:
         df = pd.read_csv(io.StringIO(file_content.decode("utf-8")))
-        translated = translate_manager.translate_product(df)
+        translated = await translate_manager.translate_product(df)
         result = translated.to_dict("records")
         task_tracker.update_task(task_id, "completed", result=result)
     except Exception as e:
@@ -178,18 +178,18 @@ async def process_pipeline_task(
     """Background task to process pipeline request."""
     try:
         # 1. Read the CSV file
-        df = pd.read_csv(io.BytesIO(file_content))
         task_tracker.update_task(task_id, "processing", progress={"step": "reading_file"})
+        df = pd.read_csv(io.BytesIO(file_content))
 
         # clean "Title" column drop nulls
+        task_tracker.update_task(task_id, "processing", progress={"step": "cleaning_data"})
         df_cleaned = df[df["Title"].notna()]
         del df
-        task_tracker.update_task(task_id, "processing", progress={"step": "cleaning_data"})
 
         # 2. Translate Product Names
-        df_translated = translate_manager.translate_product(df_cleaned)
-        del df_cleaned
         task_tracker.update_task(task_id, "processing", progress={"step": "translation"})
+        df_translated = await translate_manager.translate_product(df_cleaned)
+        del df_cleaned
 
         if df_translated is not None:
             df_translated.to_csv("translated_product_names.csv", index=False, sep=";")
@@ -197,14 +197,14 @@ async def process_pipeline_task(
             raise ValueError("Translation failed - no data returned")
 
         # 3. Search for Product Prices
-        df = product_manager.add_pricing_to_dataframe(df_translated)
         task_tracker.update_task(task_id, "processing", progress={"step": "pricing"})
+        df = await product_manager.add_pricing_to_dataframe(df_translated)
 
         # 4. Create Bundles
+        task_tracker.update_task(task_id, "processing", progress={"step": "bundling"})
         bundles, leftovers = product_manager.generate_bundles(
             df, lures_per_bundle, min_usd_value, target_yen_per_lure
         )
-        task_tracker.update_task(task_id, "processing", progress={"step": "bundling"})
 
         # Clean and prepare the response
         cleaned_bundles = clean_floats(bundles)
@@ -220,15 +220,9 @@ async def process_pipeline_task(
         # Save results
         bundles_df = pd.DataFrame(cleaned_bundles)
         leftovers_df = pd.DataFrame(cleaned_leftovers)
-
-        bundles_df.to_json("bundles.json", orient="records", force_ascii=False)
-        leftovers_df.to_json("leftovers.json", orient="records", force_ascii=False)
-        bundles_df.to_csv("bundles.csv", index=False)
-        leftovers_df.to_csv("leftovers.csv", index=False)
-
         task_tracker.update_task(task_id, "completed", result=response_data)
     except Exception as e:
-        logging.error(f"Pipeline failed: {str(e)}")
+        logging.error(f"Pipeline processing failed: {str(e)}")
         task_tracker.update_task(task_id, "failed", error=str(e))
 
 

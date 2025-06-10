@@ -1,6 +1,8 @@
 import json
 import re
-from typing import Any
+import logging
+import asyncio
+from typing import Any, List
 from bs4 import BeautifulSoup
 
 
@@ -16,6 +18,7 @@ class EbaySpider(object):
         self.base_url: list[str] = ["https://www.ebay.com.au/", "https://www.ebay.com"]
         self.response: SpiderResponse = SpiderResponse()
         self.parser: EbayParser = EbayParser()
+        self.logger = logging.getLogger(__name__)
 
     def search_products(self, query: str):
         response = self.response.get_response(
@@ -35,61 +38,57 @@ class EbaySpider(object):
 
         return products
 
-    def get_products(self, query: str):
-        product_lists: list[ProductRequest] = []
-        response = self.response.get_response(
-            url=f"{self.base_url[0]}sch/i.html?",
-            params={
-                "_nkw": query,
-                "_sacat": 0,
-                "_from": "R40",
-                "_trksid": "p2334524.m570.l1313",
-                "_odkw": "laptop",
-                "_osacat": 0,
-            },
-            mode="httpx",
-        )
+    async def get_products(self, query: str):
+        """Get products from eBay search results asynchronously"""
+        try:
+            # Get search results
+            search_url = f"https://www.ebay.com.au/sch/i.html?_nkw={query}"
+            response = await self.response.get_response_async(url=search_url, mode="httpx")
+            products = self.parser.parse_products(soup=response)
+            
+            product_lists = []
+            for product in products:
+                # Get product details
+                product_url = product.get("product_url")
+                if not product_url:
+                    continue
+                    
+                product_details = await self.get_product_details(product_url)
+                if not product_details:
+                    continue
 
-        products = self.parser.parse_products(soup=response) # <- product list nya
+                # Extract variant price
+                variant_price = None
+                if hasattr(product_details, "prices") and product_details.prices:
+                    variant_price = product_details.prices.actual_price
 
-        for product in products:
-            product_url = product['product_url']
-            product_details = self.get_product_details(product_url) # <- product detail
+                mapped_product = ProductRequest(
+                    handle=getattr(product, 'handle', None),
+                    title=getattr(product, 'title', None),
+                    body_html=product_details.body_html,
+                    vendor=product_details.vendor,
+                    product_category=product_details.product_category,
+                    variant_sku=product_details.variant_sku,
+                    image_src=product_details.image_src,
+                    image_alt_text=product_details.image_alt_text,
+                    variant_price=variant_price,
+                )
+                product_lists.append(mapped_product)
 
-            # Extract price and remove non-numeric characters
-            price_string = product_details.prices.price_primary if product_details.prices else None
-            variant_price = float(re.sub(r"[^0-9.]", "", price_string)) if price_string else None
+            return product_lists
+        except Exception as e:
+            self.logger.error(f"Failed to get products: {str(e)}")
+            return []
 
-            mapped_product = ProductRequest(
-                handle=getattr(product, 'handle', None),
-                title=getattr(product, 'title', None),
-                body_html=product_details.body_html,
-                vendor=product_details.vendor,
-                product_category=product_details.product_category,
-                variant_sku=product_details.variant_sku,
-                image_src=product_details.image_src,
-                image_alt_text=product_details.image_alt_text,
-                variant_price=variant_price,
-                # Condition=product_details.Condition,
-                # Brand=product_details.Brand,
-                # Bait_Type=product_details.Bait_Type,
-                # Bait_Shape=getattr(product_details, 'Bait_Shape', None), # Assuming Bait_Shape might be missing
-                # Buoyancy=getattr(product_details, 'Buoyancy', None), # Assuming Buoyancy might be missing
-                # Number_in_Pack=getattr(product_details, 'Number_in_Pack', None), # Assuming Number_in_Pack might be missing
-                # Material=getattr(product_details, 'Material', None), # Assuming Material might be missing
-                # Item_Weight=getattr(product_details, 'Item_Weight', None), # Assuming Item_Weight might be missing
-                # Colour=getattr(product_details, 'Colour', None) # Assuming Colour might be missing
-            )
-            product_lists.append(mapped_product)
-
-        return product_lists
-
-    def get_product_details(self, url: str):
-        response = self.response.get_response(url=url, mode="httpx")
-        # f = open(cfg.TEMP_DIR / "response.html", "r")
-        # soup = BeautifulSoup(f.read(), "html.parser")
-        product = self.parser.parse_product_details(soup=response)
-        return product
+    async def get_product_details(self, url: str):
+        """Get product details asynchronously"""
+        try:
+            response = await self.response.get_response_async(url=url, mode="httpx")
+            product = self.parser.parse_product_details(soup=response)
+            return product
+        except Exception as e:
+            self.logger.error(f"Failed to get product details: {str(e)}")
+            return None
 
     def search_products_with_details(self, query: str):
         products = self.search_products(query=query)
