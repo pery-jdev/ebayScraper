@@ -90,19 +90,17 @@ class EbaySpider(object):
             self.logger.error(f"Failed to get product details: {str(e)}")
             return None
 
-    def search_products_with_details(self, query: str):
+    async def search_products_with_details(self, query: str):
         products = self.search_products(query=query)
         for product in products:
-            product_details = self.get_product_details(product['product_url'])
+            product_details = await self.get_product_details(product['product_url'])
             product['product_details'] = product_details
         return products
 
-    def generate_products(self, query: str, category: str = None):
-        products = self.get_products(query=query)
+    async def generate_products(self, query: str, category: str = None):
+        products = await self.get_products(query=query)
         print(products)
         return products
-
-        # Format produk sesuai kebutuhan API
 
     def format_products(self, products: list[Any]):
         formatted_products = []

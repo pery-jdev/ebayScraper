@@ -17,9 +17,9 @@ class EbayProductManager:
         self.currency_manager = CurrencyManager()
         self._current_df = None
 
-    def get_products(self, query: str, category: str = None):
+    async def get_products(self, query: str, category: str = None):
         try:
-            products = self.ebay_spider.generate_products(
+            products = await self.ebay_spider.generate_products(
                 query=query, category=category
             )
             products_list = products
@@ -29,9 +29,9 @@ class EbayProductManager:
             self.logger.error(f"Failed to get products: {str(e)}")
             return []
 
-    def search_products(self, query: str, category: str = None):
+    async def search_products(self, query: str, category: str = None):
         try:
-            products = self.ebay_spider.search_products_with_details(query=query)
+            products = await self.ebay_spider.search_products_with_details(query=query)
             products_list = products
             return products_list
 
@@ -40,16 +40,22 @@ class EbayProductManager:
             return []
 
     def format_products(self, products):
-        formatted_products = []
-        for product in products:
-            product_data = {}
-        return formatted_products
+        return []  # Return empty list since we're not using the formatted products
 
     def test_product_detail(self):
-        #! testing product detail
-        detail = self.ebay_spider.get_product_details(
-            url="https://www.ebay.com.au/itm/296469100027?_skw=lure+fishing&itmmeta=01JTDZ4ZM31RWX6G53D58EG4BH&hash=item4506ef75fb:g:srIAAOSwNcRmWSn3&itmprp=enc%3AAQAKAAAAwFkggFvd1GGDu0w3yXCmi1eZahIzPiFTwTzzospSpd0xQY%2B0nOl1%2BL%2FY2o9MXq9jSZdB3ZLJ1O5q4Ad9C74JFhRvc50gKpH%2FJBkGvyWLZ7uIEU9da0XOXQD9LVLjbACA1kRNkhowgyvVDfiBxyfSgbINx8rYDbUmPCmt2nYNSkr6ibAHwzDaVtPywQD7xUB9MKWUDFRiNBE8d6EkUGcVrSLvxbtebirXPMR--2H9DVVmO5I%2FdvyRzXLBjE7X9l1MTg%3D%3D%7Ctkp%3ABlBMUKr6k7_TZQ"
+        # Testing product detail
+        base_url = "https://www.ebay.com.au/itm/296469100027"
+        params = (
+            "?_skw=lure+fishing"
+            "&itmmeta=01JTDZ4ZM31RWX6G53D58EG4BH"
+            "&hash=item4506ef75fb:g:srIAAOSwNcRmWSn3"
+            "&itmprp=enc%3AAQAKAAAAwFkggFvd1GGDu0w3yXCmi1eZahIzPiFTwTzzospSpd0xQY"
+            "%2B0nOl1%2BL%2FY2o9MXq9jSZdB3ZLJ1O5q4Ad9C74JFhRvc50gKpH%2FJBkGvyWLZ7uIEU9da0XOXQD"
+            "9LVLjbACA1kRNkhowgyvVDfiBxyfSgbINx8rYDbUmPCmt2nYNSkr6ibAHwzDaVtPywQD7xUB9MKWUDFR"
+            "iNBE8d6EkUGcVrSLvxbtebirXPMR--2H9DVVmO5I%2FdvyRzXLBjE7X9l1MTg%3D%3D%7Ctkp%3ABlBMUKr6k7_TZQ"
         )
+        url = base_url + params
+        detail = self.ebay_spider.get_product_details(url=url)
 
         return detail
 

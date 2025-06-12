@@ -39,12 +39,8 @@ async def process_search_task(task_id: str, query: str, category: str = None):
             progress={"processed": 0, "total": 0, "status": "fetching_products"}
         )
         
-        # Run product search in a separate thread to avoid blocking
-        loop = asyncio.get_event_loop()
-        products = await loop.run_in_executor(
-            None, 
-            lambda: product_manager.search_products(query=query, category=category)
-        )
+        # Run product search
+        products = await product_manager.search_products(query=query, category=category)
         
         total_count = len(products) if products else 0
         task_tracker.update_task(
@@ -65,17 +61,13 @@ async def process_search_task(task_id: str, query: str, category: str = None):
         for i in range(0, total_count, batch_size):
             batch = products[i:i + batch_size]
             
-            # Process batch in a separate thread
-            processed_batch = await loop.run_in_executor(
-                None,
-                lambda b: [
-                    {**p, 'product_details': asdict(p['product_details'])} 
-                    if 'product_details' in p and p['product_details'] 
-                    else p 
-                    for p in b
-                ],
-                batch
-            )
+            # Process batch
+            processed_batch = [
+                {**p, 'product_details': asdict(p['product_details'])} 
+                if 'product_details' in p and p['product_details'] 
+                else p 
+                for p in batch
+            ]
             
             total_products.extend(processed_batch)
             processed_count += len(batch)
